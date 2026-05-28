@@ -567,14 +567,17 @@ function hideError() {
 
 // ── Generate flow ─────────────────────────────────────────────────────────────
 
-function extractSlugFromLog(text) {
-  const m = text.match(/Slug:\s+([a-z0-9-]+)/);
-  return m ? m[1] : null;
+function extractSlugFromText(text) {
+  // Run on a single raw SSE message — newlines terminate the match cleanly
+  const m = text.match(/Slug:\s+([\w-]+)/);
+  const slug = m ? m[1].trim() : null;
+  if (slug) console.log('[BTH] slug extracted:', JSON.stringify(slug));
+  return slug;
 }
 
-function extractLiveUrlFromLog(text) {
-  const m = text.match(/Live at:\s+(https:\/\/[^\s]+\.netlify\.app)/);
-  return m ? m[1] : null;
+function extractLiveUrlFromText(text) {
+  const m = text.match(/Live at:\s+(https:\/\/[\w-]+\.netlify\.app)/);
+  return m ? m[1].trim() : null;
 }
 
 async function doGenerate() {
@@ -597,21 +600,29 @@ async function doGenerate() {
   btnGenerate.textContent = 'GENERIRA';
   setLogStatus('Pipeline se izvodi…', '#C9A227');
 
+  // Accumulate slug and URL from raw SSE messages (no DOM text-content concatenation issues)
+  let foundSlug = null;
+  let foundUrl = null;
+
   try {
     await streamPost('/api/generate', { companyWallUrl: url, niche }, (data) => {
       if (data.type === 'log') {
         appendLog(data.text);
+        // Extract from the raw message text — newlines terminate matches cleanly
+        const slug = extractSlugFromText(data.text);
+        if (slug) foundSlug = slug;
+        const liveUrlVal = extractLiveUrlFromText(data.text);
+        if (liveUrlVal) foundUrl = liveUrlVal;
       }
       if (data.type === 'done') {
         if (data.success) {
-          const logText = logArea.textContent ?? '';
-          currentSlug = extractSlugFromLog(logText);
-          const deployedUrl = extractLiveUrlFromLog(logText);
+          currentSlug = foundSlug;
+          console.log('[BTH] currentSlug set to:', JSON.stringify(currentSlug));
           setLogStatus('Gotovo! ✓', '#52A882');
           if (currentSlug) showActionButtons();
-          if (deployedUrl) {
-            urlLink.href = deployedUrl;
-            urlLink.textContent = deployedUrl;
+          if (foundUrl) {
+            urlLink.href = foundUrl;
+            urlLink.textContent = foundUrl;
             liveUrl.style.display = 'block';
           }
           loadClients();
