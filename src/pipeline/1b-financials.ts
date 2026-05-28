@@ -89,58 +89,59 @@ export async function scrapeFinancials(companyWallUrl: string): Promise<Financia
       const tables = Array.from(document.querySelectorAll('table'));
       if (tables.length === 0) return null;
 
-      // Pick the table with the most rows (most likely the financials table)
-      const mainTable = tables.reduce((best, t) =>
-        t.rows.length > best.rows.length ? t : best,
-      tables[0]!);
+      // Fix 3: target the table that contains 'Ukupni prihodi', not just the largest
+      const revenueKeywords = ['ukupni prihodi', 'prihodi', 'prihod'];
+      const mainTable = tables.find((t) => {
+        const text = t.textContent?.toLowerCase() ?? '';
+        return revenueKeywords.some((kw) => text.includes(kw));
+      }) ?? tables.reduce((best, t) =>
+        t.rows.length > best.rows.length ? t : best, tables[0]!);
 
       // Year headers — look for 4-digit numbers starting with 20
-      const yearCells = Array.from(
+      const headerCells = Array.from(
         mainTable.querySelectorAll('thead tr th, thead tr td, tr:first-child th, tr:first-child td'),
       );
-      const years: number[] = [];
-      const yearColIndexes: number[] = [];
 
-      yearCells.forEach((cell, i) => {
+      // Fix 1: collect {year, colIdx} pairs, sort descending after
+      const yearCols: Array<{ year: number; colIdx: number }> = [];
+      headerCells.forEach((cell, i) => {
         const text = cell.textContent?.trim() ?? '';
         if (/^20\d{2}$/.test(text)) {
-          years.push(parseInt(text, 10));
-          yearColIndexes.push(i);
+          yearCols.push({ year: parseInt(text, 10), colIdx: i });
         }
       });
 
-      if (years.length === 0) return null;
+      if (yearCols.length === 0) return null;
 
-      // Body rows
-      const bodyRows: Array<{ label: string; values: string[] }> = [];
-      const rows = Array.from(mainTable.querySelectorAll('tbody tr, tr')).slice(1); // skip header
+      // Body rows — store ALL cell values so we can index by colIdx after sorting
+      const bodyRows: Array<{ label: string; allValues: string[] }> = [];
+      const rows = Array.from(mainTable.querySelectorAll('tbody tr, tr')).slice(1);
 
       for (const row of rows) {
         const cells = Array.from(row.querySelectorAll('td, th'));
         if (cells.length < 2) continue;
-
         const label = cells[0]?.textContent?.trim() ?? '';
         if (!label) continue;
-
-        // Values at the year column positions
-        const values = yearColIndexes.map((ci) => cells[ci]?.textContent?.trim() ?? '');
-        bodyRows.push({ label, values });
+        const allValues = cells.map((c) => c.textContent?.trim() ?? '');
+        bodyRows.push({ label, allValues });
       }
 
-      return { years, rows: bodyRows };
+      return { yearCols, rows: bodyRows };
     });
 
-    if (!raw || raw.years.length === 0 || raw.rows.length === 0) {
+    if (!raw || raw.yearCols.length === 0 || raw.rows.length === 0) {
       logger.warn('  [Financials] No table data found — using empty defaults');
       return EMPTY;
     }
 
-    // Take up to 3 most recent years (data comes newest-first from CompanyWall)
-    const yearsToUse = raw.years.slice(0, 3);
-    const numCols = yearsToUse.length;
+    // Fix 1: sort descending, take 3 most recent
+    const sortedYearCols = raw.yearCols
+      .slice()
+      .sort((a, b) => b.year - a.year)
+      .slice(0, 3);
 
     // Build one YearlyFinancials per year
-    const yearData: YearlyFinancials[] = yearsToUse.map((year) => ({
+    const yearData: YearlyFinancials[] = sortedYearCols.map(({ year }) => ({
       year,
       revenue: 0, expenses: 0, profit: 0,
       capital: 0, assets: 0,
@@ -151,12 +152,14 @@ export async function scrapeFinancials(companyWallUrl: string): Promise<Financia
     for (const row of raw.rows) {
       const field = matchLabel(row.label);
       if (!field) continue;
-      for (let i = 0; i < numCols; i++) {
-        const val = parseCroatianNumber(row.values[i] ?? '');
+      sortedYearCols.forEach(({ colIdx }, i) => {
+        let val = parseCroatianNumber(row.allValues[colIdx] ?? '');
+        // Fix 2: employee count must be an integer, not float
+        if (field === 'employees') val = Math.round(val);
         if (yearData[i]) {
           (yearData[i] as unknown as Record<string, unknown>)[field] = val;
         }
-      }
+      });
     }
 
     // Filter out years where we got zero revenue (no useful data)

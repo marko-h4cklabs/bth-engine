@@ -1,29 +1,26 @@
-import { createWriteStream, readFileSync, unlinkSync } from 'fs';
-import { resolve } from 'path';
-import { tmpdir } from 'os';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const archiver = require('archiver') as (format: import('archiver').Format, options?: import('archiver').ArchiverOptions) => import('archiver').Archiver;
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { resolve, join } from 'path';
+import JSZip from 'jszip';
 import { logger } from '../utils/logger.js';
 
-function zipDir(sourceDir: string): Promise<ArrayBuffer> {
-  return new Promise((done, fail) => {
-    const tmp = resolve(tmpdir(), `bth-deploy-${Date.now()}.zip`);
-    const out = createWriteStream(tmp);
-    const arc = archiver('zip', { zlib: { level: 9 } });
+async function zipDir(sourceDir: string): Promise<ArrayBuffer> {
+  const zip = new JSZip();
 
-    out.on('close', () => {
-      try {
-        const buf = readFileSync(tmp);
-        unlinkSync(tmp);
-        done(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-      } catch (e) { fail(e); }
-    });
-    arc.on('error', fail);
-    arc.pipe(out);
-    arc.directory(sourceDir, false);
-    arc.finalize();
-  });
+  function addDir(dir: string, prefix: string): void {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const name = prefix ? `${prefix}/${entry}` : entry;
+      if (statSync(full).isDirectory()) {
+        addDir(full, name);
+      } else {
+        zip.file(name, readFileSync(full));
+      }
+    }
+  }
+
+  addDir(sourceDir, '');
+  const nodeBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  return nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength) as ArrayBuffer;
 }
 
 interface NetlifySite { id: string; name: string; subdomain: string }

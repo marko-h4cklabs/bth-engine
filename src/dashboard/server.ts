@@ -4,11 +4,9 @@ import { config as loadDotenv } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
-import { createWriteStream, existsSync, readFileSync, unlinkSync } from 'fs';
-import { tmpdir } from 'os';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const archiver = require('archiver') as (format: import('archiver').Format, options?: import('archiver').ArchiverOptions) => import('archiver').Archiver;
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
+import JSZip from 'jszip';
 import type { Request, Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -111,28 +109,24 @@ app.post('/api/export', (req: Request, res: Response) => {
 
 // ── Netlify REST helpers ──────────────────────────────────────────────────────
 
-function zipDirectory(sourceDir: string): Promise<ArrayBuffer> {
-  return new Promise((done, fail) => {
-    const tmpPath = resolve(tmpdir(), `bth-deploy-${Date.now()}.zip`);
-    const output = createWriteStream(tmpPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+async function zipDirectory(sourceDir: string): Promise<ArrayBuffer> {
+  const zip = new JSZip();
 
-    output.on('close', () => {
-      try {
-        const nodeBuf = readFileSync(tmpPath);
-        unlinkSync(tmpPath);
-        // Slice to get a proper ArrayBuffer (Node Buffer.buffer may be shared)
-        done(nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength));
-      } catch (e) {
-        fail(e);
+  function addDir(dir: string, prefix: string): void {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const name = prefix ? `${prefix}/${entry}` : entry;
+      if (statSync(full).isDirectory()) {
+        addDir(full, name);
+      } else {
+        zip.file(name, readFileSync(full));
       }
-    });
-    archive.on('error', fail);
+    }
+  }
 
-    archive.pipe(output);
-    archive.directory(sourceDir, false);
-    archive.finalize();
-  });
+  addDir(sourceDir, '');
+  const nodeBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  return nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength) as ArrayBuffer;
 }
 
 interface NetlifySite { id: string; name: string; subdomain: string }
