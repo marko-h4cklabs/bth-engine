@@ -5,17 +5,19 @@ import type { BusinessBase, GoogleData, AiAuditResult } from '../types/index.js'
 
 const MODEL = 'claude-sonnet-4-6';
 
-const SYSTEM_PROMPT = `You are simulating how an AI assistant like ChatGPT or Perplexity would respond to a patient or customer in Zagreb, Croatia looking for a local business recommendation.
-Respond naturally and helpfully as that AI assistant would, drawing on general knowledge about Zagreb businesses and services. Do not mention that you are Claude or that you are simulating anything. Answer in Croatian unless the question is in English.
+function buildSystemPrompt(city: string): string {
+  return `You are simulating how an AI assistant like ChatGPT or Perplexity would respond to a patient or customer in ${city}, Croatia looking for a local business recommendation.
+Respond naturally and helpfully as that AI assistant would, drawing on general knowledge about ${city} businesses and services. Do not mention that you are Claude or that you are simulating anything. Answer in Croatian unless the question is in English.
 Keep your response between 100 and 200 words.`;
+}
 
-function buildQueries(nicheLabel: string): string[] {
+function buildQueries(nicheLabel: string, city: string): string[] {
   return [
-    `Koja ${nicheLabel} u Zagrebu biste preporučili i zašto?`,
-    `Gdje mogu pronaći dobru ${nicheLabel} u centru Zagreba?`,
-    `Koja je najpoznatija ${nicheLabel} u Zagrebu prema iskustvima pacijenata?`,
-    `Preporuči mi provjerenu ${nicheLabel} u Zagrebu — što si čuo o njima?`,
-    `Best ${nicheLabel} in Zagreb?`,
+    `Koja ${nicheLabel} u ${city}u biste preporučili i zašto?`,
+    `Gdje mogu pronaći dobru ${nicheLabel} u ${city}u?`,
+    `Koja je najpoznatija ${nicheLabel} u ${city}u prema iskustvima klijenata?`,
+    `Preporuči mi provjerenu ${nicheLabel} u ${city}u — što si čuo o njima?`,
+    `Best ${nicheLabel} in ${city}?`,
   ];
 }
 
@@ -101,7 +103,9 @@ export async function runAiAudit(
   competitors: GoogleData['competitors'],
 ): Promise<AiAuditResult> {
   const client = new Anthropic();
-  const queries = buildQueries(nicheLabel);
+  const city = business.city;
+  const queries = buildQueries(nicheLabel, city);
+  const systemPrompt = buildSystemPrompt(city);
 
   const results: AiAuditResult['queries'] = [];
 
@@ -113,7 +117,7 @@ export async function runAiAudit(
       const message = await client.messages.create({
         model: MODEL,
         max_tokens: 400,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: [{ role: 'user', content: query }],
       });
 

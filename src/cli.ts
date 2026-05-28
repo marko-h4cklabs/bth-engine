@@ -48,18 +48,16 @@ program
   .command('generate <companyWallUrl>')
   .description('Run the full pipeline for a CompanyWall URL and generate PDF + landing page')
   .requiredOption('--niche <slug>', 'Business niche slug (e.g. estetska-medicina)')
-  .option('--city <city>', 'Target city', 'zagreb')
   .option('--deploy', 'Deploy landing page after generation')
   .option('--dry-run', 'Run all steps, print output, skip PDF and deploy')
   .action(async (companyWallUrl: string, opts: {
     niche: string;
-    city: string;
     deploy?: boolean;
     dryRun?: boolean;
   }) => {
     logger.section('BTH Generate');
     logger.info(`URL:   ${chalk.bold(companyWallUrl)}`);
-    logger.info(`Niche: ${opts.niche}  |  City: ${opts.city}`);
+    logger.info(`Niche: ${opts.niche}`);
     if (opts.dryRun) logger.warn('DRY RUN — PDF and deploy will be skipped');
 
     try {
@@ -67,7 +65,6 @@ program
       await runPipeline({
         companyWallUrl,
         niche: opts.niche,
-        city: opts.city,
         ...(opts.deploy !== undefined && { deploy: opts.deploy }),
         ...(opts.dryRun !== undefined && { dryRun: opts.dryRun }),
       });

@@ -75,6 +75,19 @@ async function extractDirector(page: import('playwright').Page): Promise<string>
   });
 }
 
+// CompanyWall address format: "Street Name 1, PostalCode, CityName, Hrvatska"
+// Find the segment after the 5-digit postal code.
+function extractCityFromAddress(address: string): string {
+  const parts = address.split(',').map((p) => p.trim());
+  for (let i = 0; i < parts.length; i++) {
+    if (/^\d{5}$/.test(parts[i] ?? '')) {
+      return parts[i + 1] ?? 'Zagreb';
+    }
+  }
+  // Fallback: second-to-last segment (before "Hrvatska")
+  return parts[parts.length - 2] ?? 'Zagreb';
+}
+
 export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
   logger.info(`Launching browser → ${url}`);
 
@@ -129,7 +142,7 @@ export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
     logger.info(`  address: "${address}"`);
 
     // ── City ──────────────────────────────────────────────────────────────────
-    const city = cityItemprop || 'Zagreb';
+    const city = extractCityFromAddress(address);
 
     // ── NKD activity ─────────────────────────────────────────────────────────
     const registeredActivity = (await extractDlValue(page, 'NKD')).replace(/\s+/g, ' ').trim();

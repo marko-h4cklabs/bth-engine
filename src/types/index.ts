@@ -53,7 +53,6 @@ export interface AiAuditResult {
 export interface PipelineInput {
   companyWallUrl: string;
   niche: string;
-  city: string;
   dryRun?: boolean;
   deploy?: boolean;
 }
