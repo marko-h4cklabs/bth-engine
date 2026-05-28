@@ -287,7 +287,8 @@ program
     // ── Generate DELIVERY_NOTE.txt ────────────────────────────────────────────
     const directorFirstName = (client.directorFullName ?? '').split(' ')[0] ?? 'Direktoru';
     const landingUrl = `https://${slug}.netlify.app`;
-    const netlifyCmd = `netlify deploy --prod --dir output/pages/${slug} --alias ${slug} --site c8bab7bf-bae0-4d53-96a6-58e34465a5f8`;
+    const netlifyCreateCmd = `netlify sites:create --name ${slug}`;
+    const netlifyDeployCmd = `netlify deploy --prod --dir output/pages/${slug} --site ${slug}`;
     const score = client.visibilityScore !== null ? `${client.visibilityScore}/100` : '—';
     const verdict = client.verdict ?? '—';
 
@@ -317,10 +318,13 @@ program
       'Envelope:  Black, C4 size (229×324mm), no window',
       '',
       '──────────────────────────────────────────────────────',
-      'NETLIFY DEPLOY',
+      'NETLIFY DEPLOY (run both commands from project root)',
       '──────────────────────────────────────────────────────',
-      'Run this command to publish the landing page:',
-      netlifyCmd,
+      '1. Create dedicated site (skip if already created):',
+      netlifyCreateCmd,
+      '',
+      '2. Deploy landing page to production:',
+      netlifyDeployCmd,
       '',
       `Landing page URL: ${landingUrl}`,
       'QR code points to this URL — deploy before sending envelope.',
@@ -352,12 +356,13 @@ program
 
     logger.section(`Export complete`);
     logger.data('Location', exportDir);
-    console.log(`\n${'═'.repeat(54)}`);
-    console.log('NETLIFY DEPLOY COMMAND (copy and run this):');
-    console.log('═'.repeat(54));
-    console.log(netlifyCmd);
+    console.log(`\n${'═'.repeat(58)}`);
+    console.log('NETLIFY DEPLOY — copy and run these two commands:');
+    console.log('═'.repeat(58));
+    console.log(`1. ${netlifyCreateCmd}`);
+    console.log(`2. ${netlifyDeployCmd}`);
     console.log(`\nLive URL after deploy: ${landingUrl}`);
-    console.log('═'.repeat(54) + '\n');
+    console.log('═'.repeat(58) + '\n');
   });
 
 // ── bth notify-test ──────────────────────────────────────────────────────────
