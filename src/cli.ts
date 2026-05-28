@@ -286,8 +286,8 @@ program
 
     // ── Generate DELIVERY_NOTE.txt ────────────────────────────────────────────
     const directorFirstName = (client.directorFullName ?? '').split(' ')[0] ?? 'Direktoru';
-    const landingUrl = client.landingPageUrl ?? `https://${slug}.netlify.app`;
-    const netlifyCmd = `netlify deploy --prod --dir output/pages/${slug} --alias ${slug}`;
+    const landingUrl = `https://${slug}.netlify.app`;
+    const netlifyCmd = `netlify deploy --prod --dir output/pages/${slug} --alias ${slug} --site c8bab7bf-bae0-4d53-96a6-58e34465a5f8`;
     const score = client.visibilityScore !== null ? `${client.visibilityScore}/100` : '—';
     const verdict = client.verdict ?? '—';
 
@@ -317,16 +317,13 @@ program
       'Envelope:  Black, C4 size (229×324mm), no window',
       '',
       '──────────────────────────────────────────────────────',
-      'LANDING PAGE',
+      'NETLIFY DEPLOY',
       '──────────────────────────────────────────────────────',
-      `URL:     ${landingUrl}`,
-      '',
-      'Deploy command (run from project root):',
+      'Run this command to publish the landing page:',
       netlifyCmd,
       '',
-      'The QR code on page 5 of the PDF points to this URL.',
-      'Do not publish the landing page until the envelope',
-      'is physically delivered.',
+      `Landing page URL: ${landingUrl}`,
+      'QR code points to this URL — deploy before sending envelope.',
       '',
       '──────────────────────────────────────────────────────',
       'CLOSER CHECKLIST',
@@ -355,7 +352,12 @@ program
 
     logger.section(`Export complete`);
     logger.data('Location', exportDir);
-    logger.data('Deploy',   netlifyCmd);
+    console.log(`\n${'═'.repeat(54)}`);
+    console.log('NETLIFY DEPLOY COMMAND (copy and run this):');
+    console.log('═'.repeat(54));
+    console.log(netlifyCmd);
+    console.log(`\nLive URL after deploy: ${landingUrl}`);
+    console.log('═'.repeat(54) + '\n');
   });
 
 // ── bth notify-test ──────────────────────────────────────────────────────────

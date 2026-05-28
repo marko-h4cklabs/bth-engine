@@ -5,14 +5,11 @@ export async function deployLandingPage(
   sourcePath: string,
   slug: string,
 ): Promise<string> {
-  const config = getConfigSafe();
-  const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const url = `${domain}/klijenti/${slug}`;
+  const clientUrl = `https://${slug}.netlify.app`;
 
   logger.info(`  Landing page path: ${sourcePath}`);
-  logger.info(`  Expected public URL: ${url}`);
-  logger.warn('  Deploy mode: local — manually upload output/pages/ to your web server');
-  logger.warn('  Or: set DEPLOY_MODE=vercel in .env for automatic deployment');
+  logger.info(`  Client URL: ${clientUrl}`);
+  logger.warn('  Run `bth export` for the ready-to-paste Netlify deploy command');
 
-  return url;
+  return clientUrl;
 }

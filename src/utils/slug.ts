@@ -7,6 +7,7 @@ const CHAR_MAP: Record<string, string> = {
 
 export function toSlug(input: string): string {
   return input
+    .replace(/\./g, '')           // strip dots so d.o.o. → doo, d.d. → dd
     .split('')
     .map((char) => CHAR_MAP[char] ?? char)
     .join('')
