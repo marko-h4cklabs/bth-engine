@@ -51,12 +51,22 @@ function buildPainStatement(data: DossierData): string {
     }
   }
 
-  // Priority 2: AI invisibility with a named competitor winning
+  // Priority 2: Google Ads gap
+  if (!data.targetRunningGoogleAds) {
+    if (data.competitor1RunningGoogleAds && data.competitor1Name !== '—') {
+      return `Vaša konkurencija (${escapeHtml(data.competitor1Name)}) oglašava se na Google Ads. Vi ne.`;
+    }
+    if (data.competitor2RunningGoogleAds && data.competitor2Name !== '—') {
+      return `Vaša konkurencija (${escapeHtml(data.competitor2Name)}) oglašava se na Google Ads. Vi ne.`;
+    }
+  }
+
+  // Priority 3: AI invisibility with a named competitor winning
   if (data.topCompetitorInAI && data.visibilityScore < 60) {
     return `AI tražilice preporučuju ${escapeHtml(data.topCompetitorInAI)} vašim potencijalnim pacijentima — ne vas.`;
   }
 
-  // Priority 3: Review count gap
+  // Priority 4: Review count gap
   const maxReviews = Math.max(data.competitor1ReviewCount, data.competitor2ReviewCount);
   if (maxReviews > 0 && data.targetReviewCount > 0 && maxReviews > data.targetReviewCount * 1.3) {
     const topName = data.competitor1ReviewCount >= data.competitor2ReviewCount
@@ -64,7 +74,7 @@ function buildPainStatement(data: DossierData): string {
     return `Imate ${data.targetReviewCount} Google recenzija. ${escapeHtml(topName)} ima ${maxReviews.toLocaleString('hr-HR')}.`;
   }
 
-  // Priority 4: Low AI score
+  // Priority 5: Low AI score
   if (data.visibilityScore < 40) {
     return `Vaš AI Visibility Score je ${data.visibilityScore}/100 — svaki drugi pacijent koji pita ChatGPT ne pronalazi vas.`;
   }
@@ -99,6 +109,10 @@ function buildComparisonTable(data: DossierData): string {
   // Meta ads: green if running, red if not running but at least one competitor is
   const adsCol = data.targetRunningAds ? '#52A882'
     : (data.competitor1RunningAds || data.competitor2RunningAds) ? '#E05252' : '#9A9590';
+
+  // Google Ads: same logic
+  const gadsCol = data.targetRunningGoogleAds ? '#52A882'
+    : (data.competitor1RunningGoogleAds || data.competitor2RunningGoogleAds) ? '#E05252' : '#9A9590';
 
   const aiCol = getScoreColor(data.visibilityScore);
 
@@ -144,6 +158,12 @@ function buildComparisonTable(data: DossierData): string {
       ${tdComp(yesNo(data.competitor2RunningAds))}
     </tr>
     <tr>
+      ${tdLabel('Google Ads')}
+      ${tdVal(yesNo(data.targetRunningGoogleAds, data.targetGoogleAdCount || undefined), gadsCol, true)}
+      ${tdComp(yesNo(data.competitor1RunningGoogleAds))}
+      ${tdComp(yesNo(data.competitor2RunningGoogleAds))}
+    </tr>
+    <tr style="background:#0E0C0A">
       ${tdLabel('AI vidljivost')}
       ${tdVal(`${data.visibilityScore}/100`, aiCol, true)}
       ${tdComp('—')}
@@ -239,6 +259,11 @@ export function assembleDossierData(
     targetAdCount: meta.activeAdCount,
     competitor1RunningAds: meta.competitorAds[0]?.isRunningAds ?? false,
     competitor2RunningAds: meta.competitorAds[1]?.isRunningAds ?? false,
+
+    targetRunningGoogleAds: output.googleAds.isRunningAds,
+    targetGoogleAdCount: output.googleAds.adCount,
+    competitor1RunningGoogleAds: output.googleAds.competitorAds[0]?.isRunningAds ?? false,
+    competitor2RunningGoogleAds: output.googleAds.competitorAds[1]?.isRunningAds ?? false,
 
     visibilityScore: audit.visibilityScore,
     verdict: audit.verdict,

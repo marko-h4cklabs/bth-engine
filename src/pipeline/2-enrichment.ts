@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { logger } from '../utils/logger.js';
 import { sleep, randomBetween } from '../utils/sleep.js';
 import { getConfigSafe } from '../utils/config.js';
-import type { BusinessBase, GoogleData, MetaAdData } from '../types/index.js';
+import type { BusinessBase, GoogleData, MetaAdData, GoogleAdsData } from '../types/index.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -231,11 +231,66 @@ async function scrapeMetaAds(
   }
 }
 
-async function fetchMetaData(
+// ── Google Ads Transparency Center ───────────────────────────────────────────
+
+async function scrapeGoogleAds(
+  page: import('playwright').Page,
+  businessName: string,
+): Promise<{ isRunning: boolean; count: number }> {
+  const encoded = encodeURIComponent(businessName);
+  const url = `https://adstransparency.google.com/advertiser?query=${encoded}&region=HR`;
+
+  try {
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+    // Extra wait for Angular to finish rendering
+    await sleep(randomBetween(2500, 3500));
+
+    const result = await page.evaluate(() => {
+      const bodyText = document.body.innerText;
+      const lower = bodyText.toLowerCase();
+
+      const noResultPhrases = ['no results', '0 results', 'no advertisers', 'nema rezultata', 'no ads found'];
+      if (noResultPhrases.some((p) => lower.includes(p))) {
+        return { isRunning: false, count: 0 };
+      }
+
+      // GAT Angular components and generic Material card selectors
+      const cards = document.querySelectorAll(
+        'gat-advertiser-preview, gat-advertiser-surface, ' +
+        '[class*="advertiser-card"], [class*="advertiser-item"], ' +
+        'mat-card:not([class*="header"]):not([class*="filter"])',
+      );
+
+      if (cards.length > 0) {
+        return { isRunning: true, count: cards.length };
+      }
+
+      // Text-based fallback: "X advertiser(s)" or "X ads"
+      const countMatch = bodyText.match(/(\d+)\s*(?:advertiser|ogla[sš])/i);
+      if (countMatch) {
+        const n = parseInt(countMatch[1]!, 10);
+        return { isRunning: n > 0, count: n };
+      }
+
+      // If the page loaded content but no explicit "no results", assume something is there
+      const hasContent = bodyText.trim().length > 200;
+      return { isRunning: hasContent, count: hasContent ? 1 : 0 };
+    });
+
+    return result;
+  } catch (err) {
+    logger.warn(`  [GoogleAds] Scrape failed for "${businessName}": ${err instanceof Error ? err.message : err}`);
+    return { isRunning: false, count: 0 };
+  }
+}
+
+// ── Combined ads scraper (one browser, two scrapers) ─────────────────────────
+
+async function fetchAdsData(
   business: BusinessBase,
   competitors: GoogleData['competitors'],
-): Promise<MetaAdData> {
-  logger.info('  [Meta] Launching browser for Ad Library...');
+): Promise<{ meta: MetaAdData; googleAds: GoogleAdsData }> {
+  logger.info('  [Ads] Launching browser for ad scraping...');
 
   const browser = await chromium.launch({
     headless: true,
@@ -248,42 +303,58 @@ async function fetchMetaData(
       locale: 'hr-HR',
       timezoneId: 'Europe/Zagreb',
       viewport: { width: 1440, height: 900 },
-      extraHTTPHeaders: {
-        'Accept-Language': 'hr-HR,hr;q=0.9,en-US;q=0.8,en;q=0.7',
-      },
+      extraHTTPHeaders: { 'Accept-Language': 'hr-HR,hr;q=0.9,en-US;q=0.8,en;q=0.7' },
     });
 
     const page = await context.newPage();
-    // Block heavy resources
     await page.route('**/*.{png,jpg,jpeg,gif,webp,mp4,woff,woff2}', (r) => r.abort());
 
-    // Scrape target
-    const metaSearchName = toSearchName(business.legalName);
-    logger.info(`  [Meta] Checking ads for "${metaSearchName}"...`);
-    const targetAds = await scrapeMetaAds(page, metaSearchName);
-    logger.info(`  [Meta] Target running ads: ${targetAds.isRunning} (${targetAds.count} found)`);
+    const searchName = toSearchName(business.legalName);
 
-    await sleep(randomBetween(1500, 3000));
+    // ── Meta ────────────────────────────────────────────────────────────────
+    logger.info(`  [Meta] Checking ads for "${searchName}"...`);
+    const targetMeta = await scrapeMetaAds(page, searchName);
+    logger.info(`  [Meta] Running: ${targetMeta.isRunning} (${targetMeta.count})`);
 
-    // Scrape each competitor
-    const competitorAds: MetaAdData['competitorAds'] = [];
+    await sleep(randomBetween(1500, 2500));
+
+    const metaCompetitorAds: MetaAdData['competitorAds'] = [];
     for (const comp of competitors) {
-      logger.info(`  [Meta] Checking ads for competitor "${comp.name}"...`);
-      const result = await scrapeMetaAds(page, comp.name);
-      competitorAds.push({
-        businessName: comp.name,
-        isRunningAds: result.isRunning,
-        activeAdCount: result.count,
-      });
-      logger.info(`  [Meta] ${comp.name}: running=${result.isRunning} (${result.count})`);
-      await sleep(randomBetween(1500, 3000));
+      logger.info(`  [Meta] Checking "${comp.name}"...`);
+      const r = await scrapeMetaAds(page, comp.name);
+      metaCompetitorAds.push({ businessName: comp.name, isRunningAds: r.isRunning, activeAdCount: r.count });
+      logger.info(`  [Meta] ${comp.name}: running=${r.isRunning} (${r.count})`);
+      await sleep(randomBetween(1500, 2500));
+    }
+
+    // ── Google Ads Transparency Center ───────────────────────────────────────
+    logger.info(`  [GoogleAds] Checking "${searchName}"...`);
+    const targetGads = await scrapeGoogleAds(page, searchName);
+    logger.info(`  [GoogleAds] Running: ${targetGads.isRunning} (${targetGads.count})`);
+
+    await sleep(randomBetween(1500, 2500));
+
+    const gadsCompetitorAds: GoogleAdsData['competitorAds'] = [];
+    for (const comp of competitors) {
+      logger.info(`  [GoogleAds] Checking "${comp.name}"...`);
+      const r = await scrapeGoogleAds(page, comp.name);
+      gadsCompetitorAds.push({ businessName: comp.name, isRunningAds: r.isRunning, adCount: r.count });
+      logger.info(`  [GoogleAds] ${comp.name}: running=${r.isRunning} (${r.count})`);
+      await sleep(randomBetween(1500, 2500));
     }
 
     return {
-      isRunningAds: targetAds.isRunning,
-      activeAdCount: targetAds.count,
-      adSamples: targetAds.samples,
-      competitorAds,
+      meta: {
+        isRunningAds: targetMeta.isRunning,
+        activeAdCount: targetMeta.count,
+        adSamples: targetMeta.samples,
+        competitorAds: metaCompetitorAds,
+      },
+      googleAds: {
+        isRunningAds: targetGads.isRunning,
+        adCount: targetGads.count,
+        competitorAds: gadsCompetitorAds,
+      },
     };
   } finally {
     await browser.close();
@@ -296,45 +367,39 @@ export async function enrichBusinessData(
   business: BusinessBase,
   niche: string,
   nicheLabel: string,
-): Promise<{ google: GoogleData; meta: MetaAdData }> {
+): Promise<{ google: GoogleData; meta: MetaAdData; googleAds: GoogleAdsData }> {
   const config = getConfigSafe();
   const apiKey = config.GOOGLE_PLACES_API_KEY;
 
-  let googlePromise: Promise<GoogleData>;
+  const googlePromise = apiKey
+    ? fetchGoogleData(business, niche, nicheLabel, apiKey).catch((err) => {
+        logger.warn(`[Google] Enrichment failed: ${err instanceof Error ? err.message : err}`);
+        return { rating: 0, reviewCount: 0, placeId: '', competitors: [] };
+      })
+    : (logger.warn('[Google] GOOGLE_PLACES_API_KEY not set — skipping'),
+       Promise.resolve({ rating: 0, reviewCount: 0, placeId: '', competitors: [] }));
 
-  if (!apiKey) {
-    logger.warn('[Google] GOOGLE_PLACES_API_KEY not set — skipping Google enrichment');
-    googlePromise = Promise.resolve({ rating: 0, reviewCount: 0, placeId: '', competitors: [] });
-  } else {
-    googlePromise = fetchGoogleData(business, niche, nicheLabel, apiKey).catch((err) => {
-      logger.warn(`[Google] Enrichment failed: ${err instanceof Error ? err.message : err}`);
-      return { rating: 0, reviewCount: 0, placeId: '', competitors: [] };
-    });
-  }
-
-  // Start both in parallel — meta needs competitor list from google so it waits
   const google = await googlePromise;
 
-  // Meta runs after google so we have competitor names
-  const meta = await fetchMetaData(business, google.competitors).catch((err) => {
-    logger.warn(`[Meta] Enrichment failed: ${err instanceof Error ? err.message : err}`);
-    return {
-      isRunningAds: false,
-      activeAdCount: 0,
-      adSamples: [],
-      competitorAds: [],
-    };
+  const emptyAds = {
+    meta: { isRunningAds: false, activeAdCount: 0, adSamples: [], competitorAds: [] },
+    googleAds: { isRunningAds: false, adCount: 0, competitorAds: [] },
+  };
+
+  const { meta, googleAds } = await fetchAdsData(business, google.competitors).catch((err) => {
+    logger.warn(`[Ads] Scraping failed: ${err instanceof Error ? err.message : err}`);
+    return emptyAds;
   });
 
-  // Pain signal
-  const highPain =
-    !meta.isRunningAds && meta.competitorAds.some((c) => c.isRunningAds);
-
-  if (highPain) {
-    logger.warn('⚠  HIGH PAIN SIGNAL: Target not running ads, competitor is.');
+  // Pain signals
+  if (!meta.isRunningAds && meta.competitorAds.some((c) => c.isRunningAds)) {
+    logger.warn('⚠  HIGH PAIN: Target not running Meta Ads, competitor is.');
+  }
+  if (!googleAds.isRunningAds && googleAds.competitorAds.some((c) => c.isRunningAds)) {
+    logger.warn('⚠  HIGH PAIN: Target not running Google Ads, competitor is.');
   }
 
-  void niche; // referenced by orchestrator for niche record lookup — unused here
+  void niche;
 
-  return { google, meta };
+  return { google, meta, googleAds };
 }

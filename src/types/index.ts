@@ -37,6 +37,16 @@ export interface MetaAdData {
   }>;
 }
 
+export interface GoogleAdsData {
+  isRunningAds: boolean;
+  adCount: number;
+  competitorAds: Array<{
+    businessName: string;
+    isRunningAds: boolean;
+    adCount: number;
+  }>;
+}
+
 export interface AiAuditResult {
   queries: Array<{
     query: string;
@@ -61,6 +71,7 @@ export interface PipelineOutput {
   business: BusinessBase;
   google: GoogleData;
   meta: MetaAdData;
+  googleAds: GoogleAdsData;
   audit: AiAuditResult;
   slug: string;
   pdfPath?: string;
@@ -90,6 +101,11 @@ export interface DossierData {
   targetAdCount: number;
   competitor1RunningAds: boolean;
   competitor2RunningAds: boolean;
+
+  targetRunningGoogleAds: boolean;
+  targetGoogleAdCount: number;
+  competitor1RunningGoogleAds: boolean;
+  competitor2RunningGoogleAds: boolean;
 
   visibilityScore: number;
   verdict: string;

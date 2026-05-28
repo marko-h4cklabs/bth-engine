@@ -43,18 +43,19 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   const nicheRecord = getNiche(input.niche);
   const nicheLabel = nicheRecord?.labelHR ?? input.niche;
 
-  let google, meta;
+  let google, meta, googleAds;
   try {
-    ({ google, meta } = await enrichBusinessData(business, input.niche, nicheLabel));
+    ({ google, meta, googleAds } = await enrichBusinessData(business, input.niche, nicheLabel));
   } catch (err) {
     logger.error(`Step 2 failed: ${err instanceof Error ? err.message : err}`);
     throw err;
   }
-  logger.data('Google rating',    String(google.rating));
-  logger.data('Review count',     String(google.reviewCount));
-  logger.data('Running Meta ads', String(meta.isRunningAds));
-  logger.data('Competitor 1',     google.competitors[0]?.name ?? 'none found');
-  logger.data('Competitor 2',     google.competitors[1]?.name ?? 'none found');
+  logger.data('Google rating',       String(google.rating));
+  logger.data('Review count',        String(google.reviewCount));
+  logger.data('Running Meta ads',    String(meta.isRunningAds));
+  logger.data('Running Google Ads',  String(googleAds.isRunningAds));
+  logger.data('Competitor 1',        google.competitors[0]?.name ?? 'none found');
+  logger.data('Competitor 2',        google.competitors[1]?.name ?? 'none found');
 
   // ── Step 3 — AI Visibility Audit ─────────────────────────────────────────
   logger.section('Step 3 — AI Visibility Audit');
@@ -71,7 +72,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
 
   const slug = clientSlug(business.legalName, business.city);
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const output: PipelineOutput = { business, google, meta, audit, slug };
+  const output: PipelineOutput = { business, google, meta, googleAds, audit, slug };
 
   // ── Step 4 — Landing page HTML ───────────────────────────────────────────
   // QR is not in the landing page HTML — assemble dossier with empty QR so
