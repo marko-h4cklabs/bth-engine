@@ -1,63 +1,74 @@
 <div class="page">
+
   <div class="page-header">
     <span class="page-header-agency">{{agencyName}}</span>
     <span class="page-header-client">{{legalName}}</span>
   </div>
 
-  <div class="page-title">Kampanja spremna za pokretanje</div>
-  <div class="page-subtitle">Vizualni prikaz oglasne strategije prilagođene vašem brendu</div>
+  <div class="section-label">
+    <div class="section-label-line"></div>
+    <div class="section-label-text">— Kampanja —</div>
+    <div class="section-label-line"></div>
+  </div>
 
-  <div style="display:flex;gap:22px;flex:1;min-height:0">
+  <div class="page-hero-sm">Kampanja prilagođena vašem brendu</div>
+  <div class="page-prepared">Vizualni prikaz oglasne strategije za {{nicheLabel}}</div>
 
-    <!-- Left: Phone mockup (60%) -->
-    <div style="flex:0 0 56%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+  <div class="gold-line"></div>
+
+  <div style="display:flex;gap:18px;flex:1;min-height:0">
+
+    <!-- Phone mockup -->
+    <div style="flex:0 0 52%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px">
       <div class="phone-frame">
         <div class="phone-notch"></div>
         <div class="phone-screen">
-          <div style="font-family:'Inter',sans-serif;font-size:6.5pt;color:#9A9590;margin-bottom:6px">Sponzorirano · {{legalName}}</div>
-
-          <!-- Fake image placeholder -->
-          <div style="height:70px;background:linear-gradient(135deg,#1C1C1C 0%,#252525 100%);border:1px solid rgba(201,168,76,0.15);display:flex;align-items:center;justify-content:center;margin-bottom:8px">
-            <span style="font-family:'CormorantGaramond',Georgia,serif;font-size:9pt;color:#C9A84C;text-align:center;padding:6px">
+          <div style="font-family:'Outfit',sans-serif;font-size:6px;color:rgba(240,237,230,0.30);margin-bottom:5px">
+            Sponzorirano · {{legalName}}
+          </div>
+          <div style="height:64px;background:linear-gradient(135deg,#181510 0%,#201C13 100%);border:1px solid rgba(201,162,39,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:7px">
+            <span style="font-family:'CormorantGaramond',Georgia,serif;font-size:8.5pt;font-style:italic;color:#C9A227;text-align:center;padding:5px;line-height:1.3">
               Kvaliteta koja<br>govori za sebe
             </span>
           </div>
-
-          <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:12pt;font-weight:600;color:#C9A84C;line-height:1.2;margin-bottom:6px">
+          <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:10.5pt;font-weight:500;color:#C9A227;line-height:1.25;margin-bottom:5px">
             Zagreb bira kvalitetu. Vaše mjesto je ovdje.
           </div>
-          <div style="font-family:'Inter',sans-serif;font-size:7pt;color:#9A9590;line-height:1.45;margin-bottom:10px">
-            Pacijenti u vašoj blizini već traže {{nicheLabel}} usluge.
-            Budite prvi koje pronađu.
+          <div style="font-family:'Outfit',sans-serif;font-size:6.5px;color:rgba(240,237,230,0.55);line-height:1.5;margin-bottom:9px">
+            Pacijenti u vašoj blizini već traže {{nicheLabel}} usluge. Budite prvi koje pronađu.
           </div>
-          <div style="background:#C9A84C;color:#0A0A0A;font-family:'Inter',sans-serif;font-size:7pt;font-weight:600;padding:5px 10px;display:inline-block">
+          <div style="background:#C9A227;color:#0C0B09;font-family:'Outfit',sans-serif;font-size:6.5px;font-weight:600;padding:4px 9px;display:inline-block;letter-spacing:0.05em">
             Saznajte više →
           </div>
         </div>
       </div>
-      <div style="font-family:'Inter',sans-serif;font-size:6.5pt;color:#9A9590;letter-spacing:0.1em;text-align:center">
-        PRIMJER META OGLASA — {{nicheLabel}}
+      <div style="font-family:'Cinzel',serif;font-size:6.5px;color:rgba(240,237,230,0.30);letter-spacing:0.2em;text-transform:uppercase;text-align:center">
+        Primjer Meta oglasa
       </div>
     </div>
 
-    <!-- Right: Case study (40%) -->
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px 20px;background:#141414;border:1px solid rgba(201,168,76,0.15)">
-      <div class="label" style="margin-bottom:14px">Rezultat prethodnog klijenta</div>
+    <!-- Case study -->
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:18px 16px;background:#141210;border:1px solid rgba(201,162,39,0.4)">
+      <div class="label" style="margin-bottom:12px">Rezultat prethodnog klijenta</div>
 
-      <div style="font-family:'Inter',sans-serif;font-size:8pt;color:#9A9590;margin-bottom:20px;line-height:1.4">
+      <div style="font-family:'Outfit',sans-serif;font-size:7.5px;color:rgba(240,237,230,0.55);margin-bottom:18px;line-height:1.5">
         {{caseStudyNiche}}<br>
-        <span style="font-size:7pt;color:#8A6F2E">Zagreb</span>
+        <span style="font-size:7px;color:rgba(201,162,39,0.55)">Zagreb</span>
       </div>
 
-      <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:26pt;font-weight:600;color:#C9A84C;line-height:1.05;margin-bottom:16px">
+      <div style="font-family:'Fraunces',Georgia,serif;font-size:22pt;font-weight:500;font-style:italic;color:#C9A227;line-height:1.05;margin-bottom:14px">
         {{caseStudyResult}}
       </div>
 
-      <div style="width:40px;height:1px;background:rgba(201,168,76,0.3);margin-bottom:14px"></div>
+      <div class="gold-line" style="margin:0 0 12px 0"></div>
 
-      <div style="font-family:'Inter',sans-serif;font-size:7.5pt;color:#9A9590;line-height:1.6">
+      <div style="font-family:'Outfit',sans-serif;font-size:7px;color:rgba(240,237,230,0.55);line-height:1.6">
         Ostvareno u roku od 60 dana<br>od pokretanja kampanje.
       </div>
     </div>
+
   </div>
+
+  <div class="page-num">3</div>
+
 </div>

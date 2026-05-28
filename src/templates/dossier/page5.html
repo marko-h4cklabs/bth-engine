@@ -1,45 +1,54 @@
 <div class="page" style="justify-content:center;align-items:center;text-align:center">
 
-  <!-- Running header — absolute positioned so it doesn't affect centering -->
-  <div class="page-header" style="position:absolute;top:12mm;left:14mm;right:14mm;margin-bottom:0">
+  <!-- Running header — absolute so it doesn't affect centering -->
+  <div class="page-header" style="position:absolute;top:10mm;left:13mm;right:13mm;margin-bottom:0">
     <span class="page-header-agency">{{agencyName}}</span>
     <span class="page-header-client">{{legalName}}</span>
   </div>
 
-  <!-- Main centered content -->
-  <div style="max-width:360px;margin:0 auto">
+  <!-- Centered content -->
+  <div style="max-width:340px;margin:0 auto">
 
-    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:46pt;font-weight:600;color:#C9A84C;line-height:1;margin-bottom:30px;letter-spacing:-0.01em">
+    <div class="section-label" style="margin-bottom:16px">
+      <div class="section-label-line"></div>
+      <div class="section-label-text">— Ekskluzivitet —</div>
+      <div class="section-label-line"></div>
+    </div>
+
+    <div style="font-family:'Fraunces',Georgia,serif;font-size:40pt;font-weight:500;font-style:italic;color:#C9A227;line-height:1;margin-bottom:26px">
       Ekskluzivnost
     </div>
 
-    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:13.5pt;font-weight:400;color:#F0EDE8;line-height:1.9;margin-bottom:34px;text-align:left">
+    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:12pt;font-weight:400;color:rgba(240,237,230,0.95);line-height:1.9;margin-bottom:28px;text-align:left">
       Poštovani {{directorLastName}},<br><br>
       Ovaj dosje pripremljen je isključivo za vas.<br><br>
       Radimo s jednom klinikom po niši u svakom gradu.
       U {{city}}u trenutno nemamo partnera
       u segmentu <em>{{nicheLabel}}</em>.<br><br>
-      <em style="color:#C9A84C">Taj prostor može biti vaš — ili vašeg konkurenta.</em>
+      <em style="color:#C9A227">Taj prostor može biti vaš — ili vašeg konkurenta.</em>
     </div>
 
     <!-- QR code -->
-    <div style="display:inline-block;padding:8px;border:2px solid #C9A84C;background:#FFFFFF;margin-bottom:12px">
-      <img src="data:image/png;base64,{{qrCodeBase64}}" style="width:130px;height:130px;display:block">
+    <div style="display:inline-block;padding:8px;border:1px solid rgba(201,162,39,0.4);background:#FFFFFF;margin-bottom:10px">
+      <img src="data:image/png;base64,{{qrCodeBase64}}" style="width:120px;height:120px;display:block">
     </div>
-    <div style="font-family:'Inter',sans-serif;font-size:8pt;color:#C9A84C;font-weight:600;letter-spacing:0.1em;margin-bottom:4px">
-      PERSONALIZIRANI VIDEO PREGLED
+    <div style="font-family:'Cinzel',serif;font-size:8px;font-weight:400;color:#C9A227;letter-spacing:0.25em;text-transform:uppercase;margin-bottom:4px">
+      Personalizirani video pregled
     </div>
-    <div style="font-family:'Inter',sans-serif;font-size:7.5pt;color:#9A9590">
+    <div style="font-family:'Outfit',sans-serif;font-size:7.5px;color:rgba(240,237,230,0.30)">
       Aktivno 48 sati od dostave
+    </div>
+
+  </div>
+
+  <!-- Footer — absolute at bottom -->
+  <div style="position:absolute;bottom:10mm;left:13mm;right:13mm">
+    <div style="border-top:1px solid rgba(201,162,39,0.4);padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'Cinzel',serif;font-size:9px;font-weight:400;color:#C9A227;letter-spacing:0.25em;text-transform:uppercase">{{agencyName}}</span>
+      <span style="font-family:'Outfit',sans-serif;font-size:7.5px;color:rgba(240,237,230,0.30)">{{agencyDomain}}</span>
     </div>
   </div>
 
-  <!-- Footer signature — absolute positioned at bottom -->
-  <div style="position:absolute;bottom:14mm;left:14mm;right:14mm">
-    <div style="border-top:1px solid rgba(201,168,76,0.3);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-family:'Inter',sans-serif;font-size:9pt;font-weight:600;color:#C9A84C">{{agencyName}}</span>
-      <span style="font-family:'Inter',sans-serif;font-size:8pt;color:#9A9590">{{agencyDomain}}</span>
-    </div>
-  </div>
+  <div class="page-num">5</div>
 
 </div>
