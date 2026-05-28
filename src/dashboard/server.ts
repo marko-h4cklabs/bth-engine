@@ -4,9 +4,7 @@ import { config as loadDotenv } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
-import JSZip from 'jszip';
+import { existsSync } from 'fs';
 import type { Request, Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -109,36 +107,12 @@ app.post('/api/export', (req: Request, res: Response) => {
 
 // ── Netlify REST helpers ──────────────────────────────────────────────────────
 
-async function zipDirectory(sourceDir: string): Promise<ArrayBuffer> {
-  const zip = new JSZip();
-
-  function addDir(dir: string, prefix: string): void {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      const name = prefix ? `${prefix}/${entry}` : entry;
-      if (statSync(full).isDirectory()) {
-        addDir(full, name);
-      } else {
-        zip.file(name, readFileSync(full));
-      }
-    }
-  }
-
-  addDir(sourceDir, '');
-  const nodeBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-  return nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength) as ArrayBuffer;
-}
-
 interface NetlifySite { id: string; name: string; subdomain: string }
-interface NetlifyDeploy { id: string; state: string }
 
 async function netlifyCreateOrFindSite(slug: string, token: string): Promise<string> {
   const createRes = await fetch('https://api.netlify.com/api/v1/sites', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: slug }),
   });
 
@@ -148,7 +122,6 @@ async function netlifyCreateOrFindSite(slug: string, token: string): Promise<str
   }
 
   if (createRes.status === 422) {
-    // Name taken — find the site in our own account
     const listRes = await fetch('https://api.netlify.com/api/v1/sites?per_page=100', {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -185,37 +158,31 @@ app.post('/api/deploy', (req: Request, res: Response) => {
     }
 
     try {
-      // Step 1: create or reuse Netlify site
+      // Step 1: REST API → get UUID site ID (bypasses CLI name resolution)
       sseWrite(res, { type: 'log', text: `[deploy] Creating / finding site "${slug}"...\n` });
       const siteId = await netlifyCreateOrFindSite(slug, token);
       sseWrite(res, { type: 'log', text: `[deploy] Site ID: ${siteId}\n` });
 
-      // Step 2: zip the landing page folder
+      // Step 2: Netlify CLI deploy with UUID site ID + --auth (no login state needed)
       const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
-      sseWrite(res, { type: 'log', text: `[deploy] Zipping ${pageDir}...\n` });
-      const zipBuf = await zipDirectory(pageDir);
-      sseWrite(res, { type: 'log', text: `[deploy] Zip ready (${(zipBuf.byteLength / 1024).toFixed(1)} KB)\n` });
+      sseWrite(res, { type: 'log', text: `[deploy] Deploying ${pageDir}...\n` });
 
-      // Step 3: upload zip as a new deploy
-      sseWrite(res, { type: 'log', text: '[deploy] Uploading to Netlify...\n' });
-      const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/zip',
-        },
-        body: zipBuf,
+      await new Promise<void>((deployResolve, deployReject) => {
+        const proc = spawn(
+          'npx',
+          ['netlify', 'deploy', '--prod', '--dir', pageDir, '--site', siteId, '--auth', token, '--json'],
+          { cwd: process.cwd(), env: process.env },
+        );
+
+        proc.stdout?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+        proc.stderr?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+        proc.on('close', (code) => {
+          if (code === 0) deployResolve();
+          else deployReject(new Error(`Netlify CLI exited with code ${code}`));
+        });
       });
 
-      if (!deployRes.ok) {
-        const errText = await deployRes.text();
-        throw new Error(`deploy upload failed (${deployRes.status}): ${errText}`);
-      }
-
-      const deploy = await deployRes.json() as NetlifyDeploy;
       const liveUrl = `https://${slug}.netlify.app`;
-
-      sseWrite(res, { type: 'log', text: `[deploy] Deploy state: ${deploy.state}\n` });
       sseWrite(res, { type: 'log', text: `[deploy] Live at: ${liveUrl}\n` });
       sseWrite(res, { type: 'url', url: liveUrl });
       sseWrite(res, { type: 'done', success: true });

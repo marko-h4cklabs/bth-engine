@@ -1,28 +1,6 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { resolve, join } from 'path';
-import JSZip from 'jszip';
+import { spawn } from 'child_process';
+import { resolve } from 'path';
 import { logger } from '../utils/logger.js';
-import { sleep } from '../utils/sleep.js';
-
-async function zipDir(sourceDir: string): Promise<ArrayBuffer> {
-  const zip = new JSZip();
-
-  function addDir(dir: string, prefix: string): void {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      const name = prefix ? `${prefix}/${entry}` : entry;
-      if (statSync(full).isDirectory()) {
-        addDir(full, name);
-      } else {
-        zip.file(name, readFileSync(full));
-      }
-    }
-  }
-
-  addDir(sourceDir, '');
-  const nodeBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
-  return nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength) as ArrayBuffer;
-}
 
 interface NetlifySite { id: string; name: string; subdomain: string }
 
@@ -53,58 +31,46 @@ async function createOrFindSite(slug: string, token: string): Promise<string> {
   throw new Error(`Create site failed (${createRes.status}): ${errText}`);
 }
 
-export async function deployLandingPage(sourcePath: string, slug: string): Promise<string> {
+export async function deployLandingPage(_sourcePath: string, slug: string): Promise<string> {
   const clientUrl = `https://${slug}.netlify.app`;
   const token = process.env.NETLIFY_TOKEN;
 
   if (!token) {
     logger.warn('  NETLIFY_TOKEN not set — skipping auto-deploy');
-    logger.warn('  Set NETLIFY_TOKEN in .env or use the dashboard Deploy button');
+    logger.warn('  Set NETLIFY_TOKEN in .env to enable auto-deploy');
     return clientUrl;
   }
 
+  // Step 1: create or reuse the Netlify site via REST API → get UUID site ID
   logger.info(`  [Deploy] Creating/finding site "${slug}"...`);
   const siteId = await createOrFindSite(slug, token);
   logger.info(`  [Deploy] Site ID: ${siteId}`);
 
+  // Step 2: deploy using Netlify CLI with the UUID site ID and --auth flag
+  // This bypasses all CLI login state and name-resolution issues.
   const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
-  logger.info(`  [Deploy] Zipping ${pageDir}...`);
-  const zipBuf = await zipDir(pageDir);
-  logger.info(`  [Deploy] Zip ready (${(zipBuf.byteLength / 1024).toFixed(1)} KB)`);
+  logger.info(`  [Deploy] Deploying ${pageDir}...`);
 
-  logger.info('  [Deploy] Uploading...');
-  const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/zip' },
-    body: zipBuf,
-  });
-
-  if (!deployRes.ok) {
-    const errText = await deployRes.text();
-    throw new Error(`Deploy upload failed (${deployRes.status}): ${errText}`);
-  }
-
-  const deploy = await deployRes.json() as { id: string; state: string };
-  logger.info(`  [Deploy] Initial state: ${deploy.state} — polling for ready...`);
-
-  // Poll until Netlify finishes processing (uploaded → processing → ready)
-  let attempts = 0;
-  while (attempts < 60) {
-    await sleep(3000);
-    const statusRes = await fetch(
-      `https://api.netlify.com/api/v1/deploys/${deploy.id}`,
-      { headers: { Authorization: `Bearer ${token}` } },
+  await new Promise<void>((res, rej) => {
+    const proc = spawn(
+      'npx',
+      ['netlify', 'deploy', '--prod', '--dir', pageDir, '--site', siteId, '--auth', token, '--json'],
+      { cwd: process.cwd(), env: process.env },
     );
-    if (!statusRes.ok) throw new Error(`Poll failed (${statusRes.status})`);
-    const status = await statusRes.json() as { state: string; error_message?: string };
-    logger.info(`  [Deploy] State: ${status.state}`);
-    if (status.state === 'ready') break;
-    if (status.state === 'error') throw new Error(`Deploy error: ${status.error_message ?? 'unknown'}`);
-    // 'uploaded' | 'processing' | 'preparing' — keep waiting
-    attempts++;
-  }
 
-  if (attempts >= 60) throw new Error('Deploy timeout after 3 minutes');
+    proc.stdout?.on('data', (d: Buffer) => {
+      const text = d.toString().trim();
+      if (text) logger.info(`  [Deploy] ${text}`);
+    });
+    proc.stderr?.on('data', (d: Buffer) => {
+      const text = d.toString().trim();
+      if (text) logger.info(`  [Deploy] ${text}`);
+    });
+    proc.on('close', (code) => {
+      if (code === 0) res();
+      else rej(new Error(`Netlify CLI exited with code ${code}`));
+    });
+  });
 
   logger.success(`  [Deploy] Live at: ${clientUrl}`);
   return clientUrl;
