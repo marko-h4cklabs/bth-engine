@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'fs';
 import { resolve, join } from 'path';
 import JSZip from 'jszip';
 import { logger } from '../utils/logger.js';
+import { sleep } from '../utils/sleep.js';
 
 async function zipDir(sourceDir: string): Promise<ArrayBuffer> {
   const zip = new JSZip();
@@ -84,8 +85,27 @@ export async function deployLandingPage(sourcePath: string, slug: string): Promi
   }
 
   const deploy = await deployRes.json() as { id: string; state: string };
-  logger.info(`  [Deploy] State: ${deploy.state}`);
-  logger.success(`  [Deploy] Live at: ${clientUrl}`);
+  logger.info(`  [Deploy] Initial state: ${deploy.state} — polling for ready...`);
 
+  // Poll until Netlify finishes processing (uploaded → processing → ready)
+  let attempts = 0;
+  while (attempts < 60) {
+    await sleep(3000);
+    const statusRes = await fetch(
+      `https://api.netlify.com/api/v1/deploys/${deploy.id}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!statusRes.ok) throw new Error(`Poll failed (${statusRes.status})`);
+    const status = await statusRes.json() as { state: string; error_message?: string };
+    logger.info(`  [Deploy] State: ${status.state}`);
+    if (status.state === 'ready') break;
+    if (status.state === 'error') throw new Error(`Deploy error: ${status.error_message ?? 'unknown'}`);
+    // 'uploaded' | 'processing' | 'preparing' — keep waiting
+    attempts++;
+  }
+
+  if (attempts >= 60) throw new Error('Deploy timeout after 3 minutes');
+
+  logger.success(`  [Deploy] Live at: ${clientUrl}`);
   return clientUrl;
 }
