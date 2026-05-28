@@ -15,40 +15,42 @@ function toSearchName(legalName: string): string {
   return legalName.replace(LEGAL_FORM_RE, '').trim();
 }
 
-// ── Google Places API ─────────────────────────────────────────────────────────
+// ── Google Places API (New) ───────────────────────────────────────────────────
 
 interface PlaceResult {
-  place_id: string;
-  name: string;
+  id: string;
+  displayName: { text: string };
   rating?: number;
-  user_ratings_total?: number;
+  userRatingCount?: number;
 }
 
 interface PlacesTextSearchResponse {
-  results: PlaceResult[];
-  status: string;
+  places?: PlaceResult[];
 }
 
 async function googleTextSearch(query: string, apiKey: string): Promise<PlaceResult[]> {
-  const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-  url.searchParams.set('query', query);
-  url.searchParams.set('language', 'hr');
-  url.searchParams.set('key', apiKey);
+  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount',
+    },
+    body: JSON.stringify({ textQuery: query, languageCode: 'hr' }),
+  });
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Places API HTTP ${res.status}`);
-
-  const data = await res.json() as PlacesTextSearchResponse;
-  if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-    throw new Error(`Places API status: ${data.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Places API HTTP ${res.status}: ${text}`);
   }
 
-  return data.results;
+  const data = await res.json() as PlacesTextSearchResponse;
+  return data.places ?? [];
 }
 
 function competitorScore(r: PlaceResult): number {
   const rating = r.rating ?? 0;
-  const count = r.user_ratings_total ?? 0;
+  const count = r.userRatingCount ?? 0;
   return rating * Math.log(count + 1);
 }
 
@@ -65,7 +67,6 @@ async function fetchGoogleData(
 ): Promise<GoogleData> {
   logger.info('  [Google] Searching for target business...');
 
-  // Search for the target
   const targetResults = await googleTextSearch(
     `${business.legalName} ${business.city}`,
     apiKey,
@@ -77,9 +78,9 @@ async function fetchGoogleData(
     return { rating: 0, reviewCount: 0, placeId: '', competitors: [] };
   }
 
-  logger.info(`  [Google] Found: "${target.name}" (${target.rating ?? 0}★, ${target.user_ratings_total ?? 0} reviews)`);
+  const targetName = target.displayName.text;
+  logger.info(`  [Google] Found: "${targetName}" (${target.rating ?? 0}★, ${target.userRatingCount ?? 0} reviews)`);
 
-  // Search for competitors by niche
   logger.info(`  [Google] Searching competitors in niche "${nicheLabel}"...`);
   const competitorResults = await googleTextSearch(
     `${nicheLabel} ${business.city}`,
@@ -87,14 +88,14 @@ async function fetchGoogleData(
   );
 
   const competitors = competitorResults
-    .filter((r) => !nameSimilar(r.name, business.legalName))
+    .filter((r) => !nameSimilar(r.displayName.text, business.legalName))
     .sort((a, b) => competitorScore(b) - competitorScore(a))
     .slice(0, 2)
     .map((r) => ({
-      name: r.name,
+      name: r.displayName.text,
       rating: r.rating ?? 0,
-      reviewCount: r.user_ratings_total ?? 0,
-      placeId: r.place_id,
+      reviewCount: r.userRatingCount ?? 0,
+      placeId: r.id,
     }));
 
   for (const c of competitors) {
@@ -103,8 +104,8 @@ async function fetchGoogleData(
 
   return {
     rating: target.rating ?? 0,
-    reviewCount: target.user_ratings_total ?? 0,
-    placeId: target.place_id,
+    reviewCount: target.userRatingCount ?? 0,
+    placeId: target.id,
     competitors,
   };
 }
