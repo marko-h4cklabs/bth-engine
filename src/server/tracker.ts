@@ -13,7 +13,7 @@ import { getConfigSafe } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
 
 const config = getConfigSafe();
-const port = config.TRACKER_PORT ?? 3456;
+const port = process.env.PORT ?? process.env.TRACKER_PORT ?? '3456';
 const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN ?? '';
 const TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID ?? '';
 
