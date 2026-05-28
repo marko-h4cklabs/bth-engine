@@ -6,7 +6,9 @@ import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { createWriteStream, existsSync, readFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
-import archiver from 'archiver';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const archiver = require('archiver') as (format: import('archiver').Format, options?: import('archiver').ArchiverOptions) => import('archiver').Archiver;
 import type { Request, Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);

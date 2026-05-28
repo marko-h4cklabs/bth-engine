@@ -1,7 +1,9 @@
 import { createWriteStream, readFileSync, unlinkSync } from 'fs';
 import { resolve } from 'path';
 import { tmpdir } from 'os';
-import archiver from 'archiver';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const archiver = require('archiver') as (format: import('archiver').Format, options?: import('archiver').ArchiverOptions) => import('archiver').Archiver;
 import { logger } from '../utils/logger.js';
 
 function zipDir(sourceDir: string): Promise<ArrayBuffer> {
