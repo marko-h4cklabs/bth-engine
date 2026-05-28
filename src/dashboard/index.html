@@ -573,7 +573,7 @@ function extractSlugFromLog(text) {
 }
 
 function extractLiveUrlFromLog(text) {
-  const m = text.match(/Live at:\s+(https:\/\/[^\s]+)/);
+  const m = text.match(/Live at:\s+(https:\/\/[^\s]+\.netlify\.app)/);
   return m ? m[1] : null;
 }
 

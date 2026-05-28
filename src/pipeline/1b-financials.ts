@@ -10,43 +10,26 @@ function parseCroatianNumber(str: string): number {
   return isNaN(n) ? 0 : n;
 }
 
-// Maps normalised label substrings to YearlyFinancials field names
-const LABEL_MAP: Array<[string, keyof YearlyFinancials]> = [
-  ['ukupni prihodi',        'revenue'],
-  ['ukupan prihod',         'revenue'],
-  ['poslovni prihodi',      'revenue'],
-  ['prihodi',               'revenue'],
-  ['ukupni rashodi',        'expenses'],
-  ['ukupan rashod',         'expenses'],
-  ['rashodi',               'expenses'],
-  ['neto dobit',            'profit'],
-  ['dobit / gubitak',       'profit'],
-  ['dobit/gubitak',         'profit'],
-  ['dobit poslovne',        'profit'],
-  ['dobit',                 'profit'],
-  ['gubitak',               'profit'],
-  ['kapital i rezerve',     'capital'],
-  ['kapital',               'capital'],
-  ['ukupna imovina',        'assets'],
-  ['ukupna aktiva',         'assets'],
-  ['imovina',               'assets'],
-  ['sredstva',              'assets'],
-  ['kratkoročne obveze',    'shortTermDebt'],
-  ['kratkorocne obveze',    'shortTermDebt'],
-  ['dugoročne obveze',      'longTermDebt'],
-  ['dugorocne obveze',      'longTermDebt'],
-  ['broj zaposlenih',       'employees'],
-  ['zaposleni',             'employees'],
-  ['prosj. bruto plaća',    'avgBruttoSalary'],
-  ['prosječna bruto plaća', 'avgBruttoSalary'],
-  ['prosj. placa',          'avgBruttoSalary'],
-  ['bruto plaća',           'avgBruttoSalary'],
-];
+// Exact CompanyWall label → field mapping.
+// Matched with startsWith so minor whitespace/punctuation variations at the end
+// don't break the match, but leading text never causes false positives.
+const FIELD_MAP: Record<string, keyof YearlyFinancials> = {
+  'Ukupni prihodi':                        'revenue',
+  'Ukupni rashodi':                        'expenses',
+  'Dobit/gubitak':                         'profit',
+  'Dobit / gubitak':                       'profit',
+  'Kapital':                               'capital',
+  'Sredstva':                              'assets',
+  'Kratkoročne obveze':                    'shortTermDebt',
+  'Dugoročne obveze':                      'longTermDebt',
+  'Broj zaposlenih':                       'employees',
+  'Prosječna bruto plaća po zaposlenom':   'avgBruttoSalary',
+};
 
 function matchLabel(raw: string): keyof YearlyFinancials | null {
-  const lower = raw.toLowerCase().trim();
-  for (const [key, field] of LABEL_MAP) {
-    if (lower.includes(key)) return field;
+  const trimmed = raw.trim();
+  for (const [label, field] of Object.entries(FIELD_MAP)) {
+    if (trimmed === label || trimmed.startsWith(label)) return field;
   }
   return null;
 }
@@ -152,9 +135,10 @@ export async function scrapeFinancials(companyWallUrl: string): Promise<Financia
     for (const row of raw.rows) {
       const field = matchLabel(row.label);
       if (!field) continue;
+      const valsByYear = sortedYearCols.map(({ colIdx }) => row.allValues[colIdx] ?? '');
+      logger.info(`  [Financials] "${row.label}" → ${field}: ${valsByYear.join(' | ')}`);
       sortedYearCols.forEach(({ colIdx }, i) => {
         let val = parseCroatianNumber(row.allValues[colIdx] ?? '');
-        // Fix 2: employee count must be an integer, not float
         if (field === 'employees') val = Math.round(val);
         if (yearData[i]) {
           (yearData[i] as unknown as Record<string, unknown>)[field] = val;
