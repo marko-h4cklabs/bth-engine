@@ -22,7 +22,7 @@ export async function generateLandingPage(data: DossierData): Promise<string> {
   const outPath = resolve(outDir, 'index.html');
 
   const calendlyUrl = config.CALENDLY_URL ?? '#';
-  const trackerUrl  = config.TRACKER_URL ? `${config.TRACKER_URL}/track` : '';
+  const trackerUrl  = config.TRACKER_URL ?? '';
   const agencyName  = config.AGENCY_NAME ?? '';
   const color       = scoreColor(data.visibilityScore);
 
