@@ -70,44 +70,61 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   logger.data('Top competitor in AI', audit.topCompetitorInAI || 'none detected');
 
   const slug = clientSlug(business.legalName, business.city);
-
-  // ── Step 4 — QR code ─────────────────────────────────────────────────────
-  logger.section('Step 4 — Generating QR code');
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const landingPageUrl = `https://${slug}.netlify.app`;
-  let qrBase64: string;
+  const output: PipelineOutput = { business, google, meta, audit, slug };
+
+  // ── Step 4 — Landing page HTML ───────────────────────────────────────────
+  // QR is not in the landing page HTML — assemble dossier with empty QR so
+  // the page can be built before the URL is confirmed live.
+  logger.section('Step 4 — Building landing page HTML');
+  let landingPagePath = '';
+  let deployedUrl = `https://${slug}.netlify.app`;
   try {
-    qrBase64 = await generateQrBase64(landingPageUrl);
-    logger.success(`  QR generated → ${landingPageUrl}`);
+    if (input.dryRun) {
+      logger.warn('  DRY RUN — skipping landing page generation');
+    } else {
+      const dossierForLanding = assembleDossierData(
+        output, input.niche, nicheLabel, deployedUrl, '',
+      );
+      landingPagePath = await generateLandingPage(dossierForLanding);
+    }
   } catch (err) {
     logger.error(`Step 4 failed: ${err instanceof Error ? err.message : err}`);
     throw err;
   }
 
-  // ── Assemble DossierData ──────────────────────────────────────────────────
-  const output: PipelineOutput = { business, google, meta, audit, slug };
-  const dossierData = assembleDossierData(output, input.niche, nicheLabel, landingPageUrl, qrBase64);
-
-  // ── Step 5 — Landing page ─────────────────────────────────────────────────
-  logger.section('Step 5 — Building landing page');
-  let landingPagePath: string;
-  let deployedUrl: string;
+  // ── Step 5 — Deploy landing page ─────────────────────────────────────────
+  logger.section('Step 5 — Deploying landing page');
   try {
-    if (input.dryRun) {
-      logger.warn('  DRY RUN — skipping landing page generation');
-      landingPagePath = '';
-      deployedUrl = landingPageUrl;
-    } else {
-      landingPagePath = await generateLandingPage(dossierData);
+    if (!input.dryRun) {
       deployedUrl = await deployLandingPage(landingPagePath, slug);
+      logger.success(`  Live at: ${deployedUrl}`);
     }
   } catch (err) {
     logger.error(`Step 5 failed: ${err instanceof Error ? err.message : err}`);
     throw err;
   }
 
-  // ── Step 6 — Compose PDF ──────────────────────────────────────────────────
-  logger.section('Step 6 — Composing PDF');
+  // ── Step 6 — QR code (URL is now confirmed live) ─────────────────────────
+  logger.section('Step 6 — Generating QR code');
+  let qrBase64 = '';
+  try {
+    if (!input.dryRun) {
+      qrBase64 = await generateQrBase64(deployedUrl);
+      logger.success(`  QR generated → ${deployedUrl}`);
+    }
+  } catch (err) {
+    logger.error(`Step 6 failed: ${err instanceof Error ? err.message : err}`);
+    throw err;
+  }
+
+  // ── Assemble final DossierData (confirmed URL + real QR) ─────────────────
+  const dossierData = assembleDossierData(
+    output, input.niche, nicheLabel, deployedUrl, qrBase64,
+  );
+
+  // ── Step 7 — Compose PDF (last — URL is live, QR is real) ────────────────
+  logger.section('Step 7 — Composing PDF');
   let pdfPath: string;
   try {
     if (input.dryRun) {
@@ -121,7 +138,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
       );
     }
   } catch (err) {
-    logger.error(`Step 6 failed: ${err instanceof Error ? err.message : err}`);
+    logger.error(`Step 7 failed: ${err instanceof Error ? err.message : err}`);
     throw err;
   }
 
