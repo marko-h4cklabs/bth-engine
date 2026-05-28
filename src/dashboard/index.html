@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BTH Engine — Dashboard</title>
+  <style>
+    :root {
+      --obsidian: #0C0B09;
+      --gold:     #C9A227;
+      --gold-dim: rgba(201,162,39,0.3);
+      --gold-bg:  rgba(201,162,39,0.08);
+      --ghost:    #F0EDE8;
+      --muted:    #8A8580;
+      --faint:    #2A2820;
+      --dark1:    #111108;
+      --dark2:    #0A0A08;
+      --danger:   #E05252;
+      --success:  #52A882;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--obsidian);
+      color: var(--ghost);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      border-bottom: 1px solid var(--gold-dim);
+      padding: 0 24px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .header-brand {
+      font-family: Georgia, serif;
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    .header-brand span {
+      color: rgba(201,162,39,0.45);
+      margin: 0 8px;
+    }
+    .header-version {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── Grid layout ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 300px 1fr 360px;
+      gap: 0;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel {
+      border-right: 1px solid var(--gold-dim);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel:last-child { border-right: none; }
+
+    .panel-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid rgba(201,162,39,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .panel-eyebrow {
+      font-size: 9px;
+      color: var(--gold);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      font-family: Georgia, serif;
+    }
+
+    .panel-body {
+      padding: 20px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* ── Form elements ── */
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      background: var(--dark1);
+      border: 1px solid var(--gold-dim);
+      color: var(--ghost);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+    input[type="text"]:focus, select:focus {
+      border-color: var(--gold);
+    }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    select { cursor: pointer; background-image: none; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, background 0.15s;
+      text-align: center;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-gold {
+      background: var(--gold);
+      color: var(--obsidian);
+    }
+    .btn-gold:hover:not(:disabled) { background: #d4aa2c; }
+
+    .btn-outline {
+      background: var(--dark1);
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      margin-top: 8px;
+    }
+    .btn-outline:hover:not(:disabled) {
+      border-color: var(--gold);
+      background: var(--gold-bg);
+    }
+
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      width: auto;
+    }
+
+    /* ── Action buttons section ── */
+    .action-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(201,162,39,0.15);
+    }
+    .action-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* ── Live URL display ── */
+    .live-url {
+      margin-top: 14px;
+      padding: 12px;
+      background: rgba(82,168,130,0.08);
+      border: 1px solid rgba(82,168,130,0.3);
+    }
+    .live-url p { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+    .live-url a {
+      color: var(--success);
+      font-size: 12px;
+      word-break: break-all;
+      text-decoration: none;
+    }
+    .live-url a:hover { text-decoration: underline; }
+
+    /* ── Error message ── */
+    .error-msg {
+      padding: 10px 12px;
+      background: rgba(224,82,82,0.1);
+      border: 1px solid rgba(224,82,82,0.3);
+      color: var(--danger);
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    /* ── Log panel ── */
+    #log-area {
+      flex: 1;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 11px;
+      line-height: 1.65;
+      padding: 14px;
+      background: var(--dark2);
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #log-area .log-line { display: block; }
+
+    .log-controls {
+      padding: 8px 14px;
+      border-top: 1px solid rgba(201,162,39,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .log-status {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Clients panel ── */
+    .clients-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .clients-table th {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 0 8px 10px;
+      border-bottom: 1px solid rgba(201,162,39,0.15);
+      white-space: nowrap;
+    }
+    .clients-table td {
+      padding: 9px 8px;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(201,162,39,0.06);
+      vertical-align: top;
+    }
+    .client-row {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .client-row:hover { background: rgba(201,162,39,0.04); }
+    .client-row.active { background: var(--gold-bg); }
+
+    .client-name {
+      color: var(--ghost);
+      font-weight: 500;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .client-niche {
+      color: var(--muted);
+      font-size: 11px;
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Score coloring done inline via JS */
+    .client-score { font-family: Georgia, serif; font-size: 12px; }
+
+    /* Status badge */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    /* ── Client detail row ── */
+    .detail-row td {
+      padding: 0;
+      border-bottom: 1px solid rgba(201,162,39,0.1);
+    }
+    .detail-inner {
+      padding: 14px 12px;
+      background: rgba(201,162,39,0.04);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .detail-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .detail-field label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .detail-field select {
+      width: auto;
+      padding: 4px 8px;
+      font-size: 11px;
+      background: var(--dark1);
+    }
+    .detail-actions { display: flex; gap: 6px; margin-left: auto; }
+
+    /* ── Empty states ── */
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 2;
+    }
+
+    /* ── Scrollbar styling ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+    /* ── Animated dots ── */
+    @keyframes dots {
+      0%   { content: '.'; }
+      33%  { content: '..'; }
+      66%  { content: '...'; }
+      100% { content: '.'; }
+    }
+    .btn-running::after {
+      content: '.';
+      animation: dots 1.2s steps(1) infinite;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+        overflow: auto;
+      }
+      .panel { border-right: none; border-bottom: 1px solid var(--gold-dim); min-height: 400px; }
+      #log-area { height: 300px; flex: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">Aurelius<span>◆</span>BTH Engine</div>
+  <div class="header-version">v0.1 dashboard</div>
+</header>
+
+<main class="grid">
+
+  <!-- ── Panel 1: Generate ─────────────────────────────────────────────────── -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-eyebrow">— Novi klijent —</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="field">
+        <label>CompanyWall URL</label>
+        <input type="text" id="url-input"
+          placeholder="https://www.companywall.hr/tvrtka/naziv/AbCd">
+      </div>
+
+      <div class="field">
+        <label>Niša</label>
+        <select id="niche-select">
+          <option value="">Učitavam niše…</option>
+        </select>
+      </div>
+
+      <div id="error-msg" class="error-msg" style="display:none"></div>
+
+      <button class="btn btn-gold" id="btn-generate">◆&nbsp; KRENI</button>
+
+      <!-- Action buttons — shown after successful generation -->
+      <div class="action-section" id="action-section" style="display:none">
+        <div class="action-label">Akcije za trenutnog klijenta</div>
+        <button class="btn btn-outline" id="btn-export">EXPORT</button>
+        <button class="btn btn-outline" id="btn-deploy">DEPLOY → NETLIFY</button>
+        <button class="btn btn-outline" id="btn-open-pdf">OTVORI PDF</button>
+
+        <div class="live-url" id="live-url" style="display:none">
+          <p>Landing page URL:</p>
+          <a id="url-link" href="#" target="_blank"></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Panel 2: Log ───────────────────────────────────────────────────────── -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-eyebrow">— Pipeline log —</span>
+    </div>
+    <div id="log-area"></div>
+    <div class="log-controls">
+      <span class="log-status" id="log-status">Spreman.</span>
+      <button class="btn btn-outline btn-sm" id="btn-clear-log">OBRIŠI LOG</button>
+    </div>
+  </section>
+
+  <!-- ── Panel 3: Clients ───────────────────────────────────────────────────── -->
+  <section class="panel">
+    <div class="panel-header">
+      <span class="panel-eyebrow">— Klijenti —</span>
+      <button class="btn btn-outline btn-sm" id="btn-refresh-clients">↻ OSVJEŽI</button>
+    </div>
+    <div class="panel-body" style="padding:0;overflow-y:auto">
+      <div id="clients-container"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let currentSlug = null;
+let expandedSlug = null;
+let isRunning = false;
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+
+const urlInput        = document.getElementById('url-input');
+const nicheSelect     = document.getElementById('niche-select');
+const errorMsg        = document.getElementById('error-msg');
+const btnGenerate     = document.getElementById('btn-generate');
+const actionSection   = document.getElementById('action-section');
+const btnExport       = document.getElementById('btn-export');
+const btnDeploy       = document.getElementById('btn-deploy');
+const btnOpenPdf      = document.getElementById('btn-open-pdf');
+const liveUrl         = document.getElementById('live-url');
+const urlLink         = document.getElementById('url-link');
+const logArea         = document.getElementById('log-area');
+const logStatus       = document.getElementById('log-status');
+const btnClearLog     = document.getElementById('btn-clear-log');
+const clientsContainer = document.getElementById('clients-container');
+const btnRefresh      = document.getElementById('btn-refresh-clients');
+
+// ── Log helpers ───────────────────────────────────────────────────────────────
+
+function stripAnsi(str) {
+  return str.replace(/\x1B\[[0-9;]*[mGKHFJABCDsu]/g, '');
+}
+
+function colorLine(text) {
+  const t = text.toLowerCase();
+  if (t.includes(' ok ') || t.includes('ok ') || t.includes('✓') || t.includes('pdf saved') ||
+      t.includes('pipeline complete') || t.includes('written') || t.includes('success'))
+    return '#52A882';
+  if (t.includes('warn') || t.includes('⚠') || t.includes('skip') || t.includes('high pain') ||
+      t.includes('run `'))
+    return '#C9A227';
+  if (t.includes('error') || t.includes('failed') || t.includes('❌') || t.includes('exception'))
+    return '#E05252';
+  if (t.includes('step ') || t.includes('────') || t.includes('bth generate') ||
+      t.includes('bth engine') || t.includes('pipeline'))
+    return '#F0EDE8';
+  return '#8A8580';
+}
+
+function appendLog(rawText) {
+  const text = stripAnsi(rawText);
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const span = document.createElement('span');
+    span.className = 'log-line';
+    span.style.color = colorLine(line);
+    span.textContent = line;
+    logArea.appendChild(span);
+  }
+  logArea.scrollTop = logArea.scrollHeight;
+}
+
+function clearLog() {
+  logArea.innerHTML = '';
+}
+
+function setLogStatus(text, color) {
+  logStatus.textContent = text;
+  logStatus.style.color = color || '#8A8580';
+}
+
+// ── SSE streaming via fetch ───────────────────────────────────────────────────
+
+async function streamPost(url, body, onMessage) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      for (const line of part.split('\n')) {
+        if (line.startsWith('data: ')) {
+          try {
+            onMessage(JSON.parse(line.slice(6)));
+          } catch {}
+        }
+      }
+    }
+  }
+
+  // Flush remaining buffer
+  if (buffer) {
+    for (const line of buffer.split('\n')) {
+      if (line.startsWith('data: ')) {
+        try {
+          onMessage(JSON.parse(line.slice(6)));
+        } catch {}
+      }
+    }
+  }
+}
+
+// ── Error display ─────────────────────────────────────────────────────────────
+
+function showError(msg) {
+  errorMsg.textContent = msg;
+  errorMsg.style.display = 'block';
+}
+
+function hideError() {
+  errorMsg.style.display = 'none';
+}
+
+// ── Generate flow ─────────────────────────────────────────────────────────────
+
+function extractSlugFromLog(text) {
+  const m = text.match(/Slug:\s+([a-z0-9-]+)/);
+  return m ? m[1] : null;
+}
+
+async function doGenerate() {
+  hideError();
+
+  const url = urlInput.value.trim();
+  const niche = nicheSelect.value;
+
+  if (!url) { showError('Unesite CompanyWall URL.'); return; }
+  if (!url.includes('companywall.hr')) { showError('URL mora biti s companywall.hr'); return; }
+  if (!niche) { showError('Odaberite nišu.'); return; }
+
+  isRunning = true;
+  currentSlug = null;
+  actionSection.style.display = 'none';
+  liveUrl.style.display = 'none';
+  clearLog();
+  btnGenerate.disabled = true;
+  btnGenerate.classList.add('btn-running');
+  btnGenerate.textContent = 'GENERIRA';
+  setLogStatus('Pipeline se izvodi…', '#C9A227');
+
+  try {
+    await streamPost('/api/generate', { companyWallUrl: url, niche }, (data) => {
+      if (data.type === 'log') {
+        appendLog(data.text);
+      }
+      if (data.type === 'done') {
+        if (data.success) {
+          currentSlug = extractSlugFromLog(logArea.textContent ?? '');
+          setLogStatus('Gotovo! ✓', '#52A882');
+          if (currentSlug) showActionButtons();
+          loadClients();
+        } else {
+          setLogStatus('Pipeline nije uspio.', '#E05252');
+          appendLog('\n❌ Generiranje nije uspjelo — provjeri log.', '#E05252');
+        }
+      }
+    });
+  } catch (err) {
+    setLogStatus('Greška pri komunikaciji.', '#E05252');
+    showError(String(err));
+  } finally {
+    isRunning = false;
+    btnGenerate.disabled = false;
+    btnGenerate.classList.remove('btn-running');
+    btnGenerate.innerHTML = '◆&nbsp; KRENI';
+  }
+}
+
+function showActionButtons() {
+  actionSection.style.display = 'block';
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+async function doExport(slug) {
+  if (!slug) return;
+  clearLog();
+  setLogStatus('Export se izvodi…', '#C9A227');
+  btnExport.disabled = true;
+
+  try {
+    await streamPost('/api/export', { slug }, (data) => {
+      if (data.type === 'log') appendLog(data.text);
+      if (data.type === 'done') {
+        setLogStatus(data.success ? 'Export gotov! ✓' : 'Export nije uspio.', data.success ? '#52A882' : '#E05252');
+      }
+    });
+  } catch (err) {
+    setLogStatus('Greška.', '#E05252');
+  } finally {
+    btnExport.disabled = false;
+  }
+}
+
+// ── Deploy ────────────────────────────────────────────────────────────────────
+
+async function doDeploy(slug) {
+  if (!slug) return;
+  clearLog();
+  liveUrl.style.display = 'none';
+  setLogStatus('Deploy se izvodi…', '#C9A227');
+  btnDeploy.disabled = true;
+
+  try {
+    await streamPost('/api/deploy', { slug }, (data) => {
+      if (data.type === 'log') appendLog(data.text);
+      if (data.type === 'url') {
+        urlLink.href = data.url;
+        urlLink.textContent = data.url;
+        liveUrl.style.display = 'block';
+      }
+      if (data.type === 'done') {
+        setLogStatus(data.success ? 'Deploy gotov! ✓' : 'Deploy nije uspio.', data.success ? '#52A882' : '#E05252');
+      }
+    });
+  } catch (err) {
+    setLogStatus('Greška.', '#E05252');
+  } finally {
+    btnDeploy.disabled = false;
+  }
+}
+
+// ── Open PDF ──────────────────────────────────────────────────────────────────
+
+async function doOpenPdf(slug) {
+  if (!slug) return;
+  try {
+    const r = await fetch(`/api/open-pdf/${slug}`);
+    if (!r.ok) {
+      const j = await r.json();
+      setLogStatus('PDF nije pronađen.', '#E05252');
+      appendLog(`PDF not found: ${j.error}`);
+    } else {
+      setLogStatus('PDF otvoren.', '#52A882');
+    }
+  } catch (err) {
+    setLogStatus('Greška.', '#E05252');
+  }
+}
+
+// ── Clients table ─────────────────────────────────────────────────────────────
+
+const STATUS_COLORS = {
+  generated: { bg: '#1E1E14', text: '#8A8580' },
+  printed:   { bg: '#0E1A26', text: '#5B9BC2' },
+  delivered: { bg: '#1E1608', text: '#C9A227' },
+  called:    { bg: '#0E1A20', text: '#52A0B2' },
+  meeting:   { bg: '#1A0E26', text: '#B25BC2' },
+  signed:    { bg: '#0E2018', text: '#52A882' },
+  dead:      { bg: '#200E0E', text: '#E05252' },
+};
+
+function scoreColor(score) {
+  if (score === null || score === undefined) return '#8A8580';
+  if (score <= 39) return '#E05252';
+  if (score <= 79) return '#C9A227';
+  return '#52A882';
+}
+
+function badgeHtml(status) {
+  const c = STATUS_COLORS[status] || { bg: '#1E1E14', text: '#8A8580' };
+  return `<span class="badge" style="background:${c.bg};color:${c.text}">${status}</span>`;
+}
+
+async function loadClients() {
+  try {
+    const r = await fetch('/api/clients');
+    const clients = await r.json();
+    renderClients(clients);
+  } catch {
+    clientsContainer.innerHTML = '<div class="empty">Greška pri učitavanju klijenata.</div>';
+  }
+}
+
+function renderClients(clients) {
+  if (!clients || clients.length === 0) {
+    clientsContainer.innerHTML = '<div class="empty">Još nema klijenata.<br>Generirajte prvog klijenta u lijevom panelu.</div>';
+    return;
+  }
+
+  const STATUSES = ['generated','printed','delivered','called','meeting','signed','dead'];
+
+  let html = `
+    <table class="clients-table">
+      <thead>
+        <tr>
+          <th>Klijent</th>
+          <th>Niša</th>
+          <th>Score</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  for (const c of clients) {
+    const score = c.visibilityScore !== null ? c.visibilityScore : null;
+    const scoreText = score !== null ? `${score}/100` : '—';
+    const color = scoreColor(score);
+    const isExpanded = expandedSlug === c.slug;
+    const visitBadge = c.pageVisitCount > 0
+      ? `<span style="color:#C9A227;font-size:10px;margin-left:4px">✓×${c.pageVisitCount}</span>`
+      : '';
+
+    const statusOptions = STATUSES.map(s =>
+      `<option value="${s}" ${s === c.status ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    html += `
+      <tr class="client-row ${isExpanded ? 'active' : ''}"
+          data-slug="${c.slug}"
+          onclick="toggleDetail('${c.slug}')">
+        <td>
+          <div class="client-name" title="${c.businessName}">${c.businessName}</div>
+        </td>
+        <td><div class="client-niche">${c.niche}</div></td>
+        <td><span class="client-score" style="color:${color}">${scoreText}</span></td>
+        <td>${badgeHtml(c.status)}${visitBadge}</td>
+      </tr>
+    `;
+
+    if (isExpanded) {
+      html += `
+        <tr class="detail-row">
+          <td colspan="4">
+            <div class="detail-inner">
+              <div class="detail-field">
+                <label>Status</label>
+                <select id="status-select-${c.slug}" onchange="updateStatus('${c.slug}', this.value)">
+                  ${statusOptions}
+                </select>
+              </div>
+              <div class="detail-actions">
+                <button class="btn btn-outline btn-sm"
+                  onclick="event.stopPropagation(); doExport('${c.slug}')">
+                  EXPORT
+                </button>
+                <button class="btn btn-outline btn-sm"
+                  onclick="event.stopPropagation(); doOpenPdf('${c.slug}')">
+                  PDF
+                </button>
+                <button class="btn btn-outline btn-sm"
+                  onclick="event.stopPropagation(); doDeploy('${c.slug}')">
+                  DEPLOY
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  html += '</tbody></table>';
+  clientsContainer.innerHTML = html;
+}
+
+function toggleDetail(slug) {
+  expandedSlug = expandedSlug === slug ? null : slug;
+  loadClients();
+}
+
+async function updateStatus(slug, status) {
+  try {
+    const r = await fetch('/api/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, status }),
+    });
+    if (r.ok) {
+      setLogStatus(`Status → ${status}`, '#52A882');
+      await loadClients();
+    }
+  } catch {}
+}
+
+// ── Niches ────────────────────────────────────────────────────────────────────
+
+async function loadNiches() {
+  try {
+    const r = await fetch('/api/niches');
+    const niches = await r.json();
+    nicheSelect.innerHTML = '';
+
+    if (!niches || niches.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Nema niša — pokrenite: bth seed-niches';
+      nicheSelect.appendChild(opt);
+      return;
+    }
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Odaberite nišu…';
+    nicheSelect.appendChild(placeholder);
+
+    for (const n of niches) {
+      const opt = document.createElement('option');
+      opt.value = n.slug;
+      opt.textContent = n.labelHR;
+      nicheSelect.appendChild(opt);
+    }
+  } catch {
+    nicheSelect.innerHTML = '<option value="">Greška pri učitavanju niša</option>';
+  }
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+
+btnGenerate.addEventListener('click', doGenerate);
+
+urlInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !isRunning) doGenerate();
+});
+
+btnClearLog.addEventListener('click', () => {
+  clearLog();
+  setLogStatus('Log obrisan.', '');
+});
+
+btnRefresh.addEventListener('click', loadClients);
+
+btnExport.addEventListener('click', () => doExport(currentSlug));
+btnDeploy.addEventListener('click', () => doDeploy(currentSlug));
+btnOpenPdf.addEventListener('click', () => doOpenPdf(currentSlug));
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+(async function init() {
+  await loadNiches();
+  await loadClients();
+})();
+</script>
+
+</body>
+</html>
