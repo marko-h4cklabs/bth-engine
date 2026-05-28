@@ -4,7 +4,9 @@ import { config as loadDotenv } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
-import { existsSync } from 'fs';
+import { createWriteStream, existsSync, readFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import archiver from 'archiver';
 import type { Request, Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +107,66 @@ app.post('/api/export', (req: Request, res: Response) => {
   });
 });
 
+// ── Netlify REST helpers ──────────────────────────────────────────────────────
+
+function zipDirectory(sourceDir: string): Promise<ArrayBuffer> {
+  return new Promise((done, fail) => {
+    const tmpPath = resolve(tmpdir(), `bth-deploy-${Date.now()}.zip`);
+    const output = createWriteStream(tmpPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    output.on('close', () => {
+      try {
+        const nodeBuf = readFileSync(tmpPath);
+        unlinkSync(tmpPath);
+        // Slice to get a proper ArrayBuffer (Node Buffer.buffer may be shared)
+        done(nodeBuf.buffer.slice(nodeBuf.byteOffset, nodeBuf.byteOffset + nodeBuf.byteLength));
+      } catch (e) {
+        fail(e);
+      }
+    });
+    archive.on('error', fail);
+
+    archive.pipe(output);
+    archive.directory(sourceDir, false);
+    archive.finalize();
+  });
+}
+
+interface NetlifySite { id: string; name: string; subdomain: string }
+interface NetlifyDeploy { id: string; state: string }
+
+async function netlifyCreateOrFindSite(slug: string, token: string): Promise<string> {
+  const createRes = await fetch('https://api.netlify.com/api/v1/sites', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name: slug }),
+  });
+
+  if (createRes.ok) {
+    const site = await createRes.json() as NetlifySite;
+    return site.id;
+  }
+
+  if (createRes.status === 422) {
+    // Name taken — find the site in our own account
+    const listRes = await fetch('https://api.netlify.com/api/v1/sites?per_page=100', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!listRes.ok) throw new Error(`Failed to list sites: ${listRes.status}`);
+    const sites = await listRes.json() as NetlifySite[];
+    const existing = sites.find((s) => s.name === slug || s.subdomain === slug);
+    if (!existing) throw new Error(`Site name "${slug}" is taken by another Netlify account`);
+    return existing.id;
+  }
+
+  const errText = await createRes.text();
+  throw new Error(`sites create failed (${createRes.status}): ${errText}`);
+}
+
 // ── POST /api/deploy ──────────────────────────────────────────────────────────
 
 app.post('/api/deploy', (req: Request, res: Response) => {
@@ -117,50 +179,58 @@ app.post('/api/deploy', (req: Request, res: Response) => {
 
   startSSE(res);
 
-  // Step 1: create dedicated Netlify site; collect output to detect "already exists"
-  let createOutput = '';
-  const create = spawn('netlify', ['sites:create', '--name', slug], {
-    cwd: process.cwd(),
-    env: { ...process.env, NO_COLOR: '1' },
-  });
-
-  create.stdout?.on('data', (d: Buffer) => {
-    const text = d.toString();
-    createOutput += text;
-    sseWrite(res, { type: 'log', text });
-  });
-  create.stderr?.on('data', (d: Buffer) => {
-    const text = d.toString();
-    createOutput += text;
-    sseWrite(res, { type: 'log', text });
-  });
-
-  create.on('close', (createCode) => {
-    const alreadyExists = /already (exists|taken|in use)/i.test(createOutput);
-
-    if (createCode !== 0 && !alreadyExists) {
-      sseWrite(res, {
-        type: 'log',
-        text: `[deploy] sites:create exited ${createCode} — attempting deploy regardless...\n`,
-      });
+  (async () => {
+    const token = process.env.NETLIFY_TOKEN;
+    if (!token) {
+      sseWrite(res, { type: 'log', text: '[deploy] ERROR: NETLIFY_TOKEN is not set in .env\n' });
+      sseWrite(res, { type: 'done', success: false });
+      res.end();
+      return;
     }
 
-    // Step 2: deploy to production (runs only after create fully exits)
-    const deploy = spawn(
-      'netlify',
-      ['deploy', '--prod', '--dir', `output/pages/${slug}`, '--site', slug],
-      { cwd: process.cwd(), env: { ...process.env, NO_COLOR: '1' } },
-    );
+    try {
+      // Step 1: create or reuse Netlify site
+      sseWrite(res, { type: 'log', text: `[deploy] Creating / finding site "${slug}"...\n` });
+      const siteId = await netlifyCreateOrFindSite(slug, token);
+      sseWrite(res, { type: 'log', text: `[deploy] Site ID: ${siteId}\n` });
 
-    deploy.stdout?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
-    deploy.stderr?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+      // Step 2: zip the landing page folder
+      const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
+      sseWrite(res, { type: 'log', text: `[deploy] Zipping ${pageDir}...\n` });
+      const zipBuf = await zipDirectory(pageDir);
+      sseWrite(res, { type: 'log', text: `[deploy] Zip ready (${(zipBuf.byteLength / 1024).toFixed(1)} KB)\n` });
 
-    deploy.on('close', (code) => {
-      sseWrite(res, { type: 'url', url: `https://${slug}.netlify.app` });
-      sseWrite(res, { type: 'done', success: code === 0 });
-      res.end();
-    });
-  });
+      // Step 3: upload zip as a new deploy
+      sseWrite(res, { type: 'log', text: '[deploy] Uploading to Netlify...\n' });
+      const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${siteId}/deploys`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/zip',
+        },
+        body: zipBuf,
+      });
+
+      if (!deployRes.ok) {
+        const errText = await deployRes.text();
+        throw new Error(`deploy upload failed (${deployRes.status}): ${errText}`);
+      }
+
+      const deploy = await deployRes.json() as NetlifyDeploy;
+      const liveUrl = `https://${slug}.netlify.app`;
+
+      sseWrite(res, { type: 'log', text: `[deploy] Deploy state: ${deploy.state}\n` });
+      sseWrite(res, { type: 'log', text: `[deploy] Live at: ${liveUrl}\n` });
+      sseWrite(res, { type: 'url', url: liveUrl });
+      sseWrite(res, { type: 'done', success: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sseWrite(res, { type: 'log', text: `[deploy] ERROR: ${msg}\n` });
+      sseWrite(res, { type: 'done', success: false });
+    }
+
+    res.end();
+  })();
 });
 
 // ── GET /api/open-pdf/:slug ───────────────────────────────────────────────────
