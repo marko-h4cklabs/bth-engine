@@ -286,7 +286,8 @@ program
 
     // ── Generate DELIVERY_NOTE.txt ────────────────────────────────────────────
     const directorFirstName = (client.directorFullName ?? '').split(' ')[0] ?? 'Direktoru';
-    const landingUrl = client.landingPageUrl ?? '[NOT SET — run pipeline first]';
+    const landingUrl = client.landingPageUrl ?? `https://${slug}.netlify.app`;
+    const netlifyCmd = `netlify deploy --prod --dir output/pages/${slug} --alias ${slug}`;
     const score = client.visibilityScore !== null ? `${client.visibilityScore}/100` : '—';
     const verdict = client.verdict ?? '—';
 
@@ -318,8 +319,10 @@ program
       '──────────────────────────────────────────────────────',
       'LANDING PAGE',
       '──────────────────────────────────────────────────────',
-      'Upload the /landing/ folder to your web server at:',
-      landingUrl,
+      `URL:     ${landingUrl}`,
+      '',
+      'Deploy command (run from project root):',
+      netlifyCmd,
       '',
       'The QR code on page 5 of the PDF points to this URL.',
       'Do not publish the landing page until the envelope',
@@ -352,6 +355,7 @@ program
 
     logger.section(`Export complete`);
     logger.data('Location', exportDir);
+    logger.data('Deploy',   netlifyCmd);
   });
 
 // ── bth notify-test ──────────────────────────────────────────────────────────

@@ -74,7 +74,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   // ── Step 4 — QR code ─────────────────────────────────────────────────────
   logger.section('Step 4 — Generating QR code');
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const landingPageUrl = `${domain}/klijenti/${slug}`;
+  const landingPageUrl = `https://${slug}.netlify.app`;
   let qrBase64: string;
   try {
     qrBase64 = await generateQrBase64(landingPageUrl);
