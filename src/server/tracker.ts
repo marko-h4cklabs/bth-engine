@@ -52,7 +52,7 @@ app.use(cors({
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', service: 'BTH Tracker' });
 });
 
 app.post('/track', async (req, res) => {
