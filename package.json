@@ -1,0 +1,50 @@
+{
+  "name": "bth-engine",
+  "version": "0.1.0",
+  "description": "Balkan Trojan Horse — B2B client acquisition engine",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "bth": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "download-fonts": "tsx scripts/download-fonts.ts",
+    "tracker": "tsx src/server/tracker.ts",
+    "preview": "npx serve output/pages -p 5000"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@types/express": "^5.0.6",
+    "better-sqlite3": "^11.1.2",
+    "chalk": "^5.3.0",
+    "cheerio": "^1.0.0",
+    "commander": "^12.1.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "got": "^14.4.2",
+    "playwright": "^1.47.0",
+    "puppeteer": "^23.4.0",
+    "qrcode": "^1.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/cors": "^2.8.19",
+    "@types/node": "^22.5.4",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "puppeteer"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+<div class="page">
+  <div class="page-header">
+    <span class="page-header-agency">{{agencyName}}</span>
+    <span class="page-header-client">{{legalName}}</span>
+  </div>
+
+  <div class="page-title">Nevidljivost u AI pretragama</div>
+  <div class="page-subtitle">Što pacijenti vide kad pitaju ChatGPT ili Perplexity</div>
+
+  <div class="card card-gold-left" style="margin-bottom:14px;flex-shrink:0">
+    <div class="label">Upit pacijenta</div>
+    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:17pt;font-weight:500;color:#F0EDE8;font-style:italic;line-height:1.35">
+      "{{bestAiQueryText}}"
+    </div>
+  </div>
+
+  <div class="card" style="flex:1;margin-bottom:16px;overflow:hidden;min-height:0">
+    <div class="label">Odgovor umjetne inteligencije</div>
+    <div style="font-family:'Inter',sans-serif;font-size:8pt;color:#F0EDE8;line-height:1.65;overflow:hidden;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical">
+      {{bestAiResponseHtml}}
+    </div>
+  </div>
+
+  <div style="flex-shrink:0;margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+      <div class="label" style="margin-bottom:0">Vaš AI Visibility Score</div>
+      <div style="font-family:'Inter',sans-serif;font-size:13pt;font-weight:600;color:{{visibilityScoreColor}}">
+        {{visibilityScore}}&thinsp;/&thinsp;100
+      </div>
+    </div>
+    <div class="gauge-track">
+      <div class="gauge-fill" style="width:{{visibilityScore}}%;background:{{visibilityScoreColor}}"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+      <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:16pt;font-weight:600;color:{{visibilityScoreColor}}">
+        {{verdict}}
+      </div>
+      <div style="font-family:'Inter',sans-serif;font-size:7.5pt;color:#9A9590">
+        od mogućih 5/5 upita
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:auto;border-top:1px solid rgba(201,168,76,0.1);padding-top:10px;flex-shrink:0">
+    <div style="font-family:'Inter',sans-serif;font-size:7.5pt;color:#9A9590;line-height:1.55">
+      U 2026. godini, AI asistenti postaju primarna točka kontakta za pronalazak zdravstvenih usluga.
+      Vidljivost u ovim sustavima jednako je važna kao SEO bio 2010.
+    </div>
+  </div>
+</div>

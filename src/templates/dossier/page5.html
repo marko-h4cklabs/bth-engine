@@ -1,0 +1,45 @@
+<div class="page" style="justify-content:center;align-items:center;text-align:center">
+
+  <!-- Running header — absolute positioned so it doesn't affect centering -->
+  <div class="page-header" style="position:absolute;top:12mm;left:14mm;right:14mm;margin-bottom:0">
+    <span class="page-header-agency">{{agencyName}}</span>
+    <span class="page-header-client">{{legalName}}</span>
+  </div>
+
+  <!-- Main centered content -->
+  <div style="max-width:360px;margin:0 auto">
+
+    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:46pt;font-weight:600;color:#C9A84C;line-height:1;margin-bottom:30px;letter-spacing:-0.01em">
+      Ekskluzivnost
+    </div>
+
+    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:13.5pt;font-weight:400;color:#F0EDE8;line-height:1.9;margin-bottom:34px;text-align:left">
+      Poštovani {{directorLastName}},<br><br>
+      Ovaj dosje pripremljen je isključivo za vas.<br><br>
+      Radimo s jednom klinikom po niši u svakom gradu.
+      U {{city}}u trenutno nemamo partnera
+      u segmentu <em>{{nicheLabel}}</em>.<br><br>
+      <em style="color:#C9A84C">Taj prostor može biti vaš — ili vašeg konkurenta.</em>
+    </div>
+
+    <!-- QR code -->
+    <div style="display:inline-block;padding:8px;border:2px solid #C9A84C;background:#FFFFFF;margin-bottom:12px">
+      <img src="data:image/png;base64,{{qrCodeBase64}}" style="width:130px;height:130px;display:block">
+    </div>
+    <div style="font-family:'Inter',sans-serif;font-size:8pt;color:#C9A84C;font-weight:600;letter-spacing:0.1em;margin-bottom:4px">
+      PERSONALIZIRANI VIDEO PREGLED
+    </div>
+    <div style="font-family:'Inter',sans-serif;font-size:7.5pt;color:#9A9590">
+      Aktivno 48 sati od dostave
+    </div>
+  </div>
+
+  <!-- Footer signature — absolute positioned at bottom -->
+  <div style="position:absolute;bottom:14mm;left:14mm;right:14mm">
+    <div style="border-top:1px solid rgba(201,168,76,0.3);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:'Inter',sans-serif;font-size:9pt;font-weight:600;color:#C9A84C">{{agencyName}}</span>
+      <span style="font-family:'Inter',sans-serif;font-size:8pt;color:#9A9590">{{agencyDomain}}</span>
+    </div>
+  </div>
+
+</div>
