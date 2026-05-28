@@ -7,49 +7,86 @@ const MODEL = 'claude-sonnet-4-6';
 
 function buildSystemPrompt(city: string): string {
   return `You are simulating how an AI assistant like ChatGPT or Perplexity would respond to a patient or customer in ${city}, Croatia looking for a local business recommendation.
-Respond naturally and helpfully as that AI assistant would, drawing on general knowledge about ${city} businesses and services. Do not mention that you are Claude or that you are simulating anything. Answer in Croatian unless the question is in English.
+Respond naturally and helpfully as that AI assistant would, drawing on general knowledge about ${city} businesses and services. Do not mention that you are Claude or that you are simulating anything. Always answer in Croatian.
 Keep your response between 100 and 200 words.`;
 }
 
+// Cities with irregular locative forms
+const LOCATIVE_OVERRIDES: Record<string, string> = {
+  zagreb: 'Zagrebu', split: 'Splitu', rijeka: 'Rijeci',
+  osijek: 'Osijeku', zadar: 'Zadru', pula: 'Puli',
+  šibenik: 'Šibeniku', varaždin: 'Varaždinu', karlovac: 'Karlovcu',
+  sisak: 'Sisku', koprivnica: 'Koprivnici', bjelovar: 'Bjelovaru',
+  dubrovnik: 'Dubrovniku', čakovec: 'Čakovcu', mačkovec: 'Mačkovcu',
+  đakovo: 'Đakovu', vukovar: 'Vukovaru', vinkovci: 'Vinkovcima',
+  'slavonski brod': 'Slavonskom Brodu',
+};
+
+function toCroatianLocative(city: string): string {
+  const key = city.toLowerCase();
+  if (LOCATIVE_OVERRIDES[key]) return LOCATIVE_OVERRIDES[key]!;
+  const lower = city.toLowerCase();
+  if (lower.endsWith('ec')) return city.slice(0, -2) + 'cu'; // Čakovec → Čakovcu
+  if (lower.endsWith('a')) return city.slice(0, -1) + 'i';   // Rijeka → Rijeci
+  return city + 'u';                                           // Zagreb → Zagrebu
+}
+
 function buildQueries(nicheLabel: string, city: string): string[] {
+  const loc = toCroatianLocative(city);
   return [
-    `Koja ${nicheLabel} u ${city}u biste preporučili i zašto?`,
-    `Gdje mogu pronaći dobru ${nicheLabel} u ${city}u?`,
-    `Koja je najpoznatija ${nicheLabel} u ${city}u prema iskustvima klijenata?`,
-    `Preporuči mi provjerenu ${nicheLabel} u ${city}u — što si čuo o njima?`,
-    `Best ${nicheLabel} in ${city}?`,
+    `Koja ${nicheLabel} u ${loc} biste preporučili i zašto?`,
+    `Gdje mogu naći dobru ${nicheLabel} u ${loc}?`,
+    `Koja je najpoznatija ${nicheLabel} u ${loc}?`,
+    `Preporuči mi provjerenu ${nicheLabel} u ${loc}`,
+    `Tražim ${nicheLabel} u ${loc} — koje biste vi odabrali?`,
   ];
 }
 
-// Generic Croatian business type words that appear in many company names
-// and are too common to use for identity matching.
-const GENERIC_PREFIXES = new Set([
-  'poliklinika', 'klinika', 'ordinacija', 'ambulanta', 'centar', 'centar',
-  'bolnica', 'ljekarna', 'apoteka', 'laboratorij', 'studio', 'salon',
-  'agencija', 'tvrtka', 'drustvo', 'obrt', 'ustanova', 'zavod',
+// Generic sector/facility words that must never count as a brand identifier
+const GENERIC_SECTOR_WORDS = new Set([
+  'poliklinika', 'klinika', 'ordinacija', 'ambulanta', 'centar', 'dom',
+  'bolnica', 'ljekarna', 'apoteka', 'laboratorij', 'zavod', 'ustanova',
+  'dispanzer', 'hitna',
+  'stomatolog', 'stomatologije', 'stomatološka', 'stomatološki',
+  'dentalni', 'dentalna', 'dentalno', 'zubni', 'zubna', 'zubar',
+  'medicinska', 'medicinski', 'specijalistička', 'specijalistički',
+  'privatna', 'privatni', 'opća', 'opći',
+  'kozmetički', 'kozmetička', 'kozmetika',
+  'salon', 'studio', 'spa', 'wellness',
+  'gym', 'fitness', 'teretana', 'sportski', 'sportska',
+  'restoran', 'hotel', 'hostel', 'caffe', 'cafe', 'bar',
+  'agencija', 'tvrtka', 'drustvo', 'obrt', 'servis', 'usluge', 'trgovina',
 ]);
 
-// Extract the first non-generic identifying word from a legal name.
-// "POLIKLINIKA BAGATIN d.o.o." → "bagatin"
-// "Dental Centar Smiljan" → "dental"  (first is not generic)
-// "BAGATIN d.o.o." → "bagatin"
-function getIdentifyingWord(legalName: string): string {
-  const words = legalName
-    .toLowerCase()
-    .split(/[\s\-,.()/]+/)
-    .filter((w) => w.length >= 3);
+const LEGAL_SUFFIX_RE = /\s+(d\.o\.o\.?|d\.d\.?|j\.d\.o\.o\.?|j\.t\.d\.?|k\.d\.?|s\.p\.?|o\.j\.?|p\.o\.).*$/i;
 
-  for (const word of words) {
-    if (!GENERIC_PREFIXES.has(word)) return word;
+// Extract the unique brand name from a legal or display name.
+// "POLIKLINIKA BAGATIN d.o.o." → "Bagatin"
+// "DENTAL FABRIQUE LAB d.o.o." → "Dental Fabrique Lab"
+// "SRNEC TEKSTIL d.o.o." → "Srnec Tekstil"
+function extractBrandName(legalName: string): string {
+  const withoutLegal = legalName.replace(LEGAL_SUFFIX_RE, '').trim();
+  const words = withoutLegal
+    .split(/[\s\-\/,.()+]+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9čćšđžČĆŠĐŽ]/g, ''))
+    .filter((w) => w.length >= 2 && !GENERIC_SECTOR_WORDS.has(w.toLowerCase()));
+
+  if (words.length === 0) {
+    // All words were generic — return full name without legal suffix, title-cased
+    return withoutLegal
+      .split(/\s+/)
+      .filter((w) => w.length >= 2)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
   }
-  // All words were generic — fall back to first word of reasonable length
-  return words[0] ?? '';
+
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function getTargetMentioned(response: string, legalName: string): boolean {
-  const id = getIdentifyingWord(legalName);
-  if (!id) return false;
-  return response.toLowerCase().includes(id);
+  const brand = extractBrandName(legalName);
+  if (!brand) return false;
+  return response.toLowerCase().includes(brand.toLowerCase());
 }
 
 function getCompetitorsMentioned(
@@ -58,8 +95,8 @@ function getCompetitorsMentioned(
 ): string[] {
   return competitors
     .filter((c) => {
-      const id = getIdentifyingWord(c.name);
-      return id.length >= 3 && response.toLowerCase().includes(id);
+      const brand = extractBrandName(c.name);
+      return brand.length >= 2 && response.toLowerCase().includes(brand.toLowerCase());
     })
     .map((c) => c.name);
 }
@@ -69,28 +106,22 @@ function getTargetPosition(
   business: BusinessBase,
   competitors: GoogleData['competitors'],
 ): number | null {
-  const allNames = [
-    business.legalName,
-    ...competitors.map((c) => c.name),
-  ];
-
+  const allNames = [business.legalName, ...competitors.map((c) => c.name)];
   const positions: Array<{ name: string; index: number }> = [];
   const lower = response.toLowerCase();
 
   for (const name of allNames) {
-    const id = getIdentifyingWord(name);
-    if (id.length < 3) continue;
-    const idx = lower.indexOf(id);
-    if (idx !== -1) {
-      positions.push({ name, index: idx });
-    }
+    const brand = extractBrandName(name);
+    if (brand.length < 2) continue;
+    const idx = lower.indexOf(brand.toLowerCase());
+    if (idx !== -1) positions.push({ name, index: idx });
   }
 
   positions.sort((a, b) => a.index - b.index);
 
-  const targetId = getIdentifyingWord(business.legalName);
-  const rank = positions.findIndex((p) =>
-    getIdentifyingWord(p.name) === targetId,
+  const targetBrand = extractBrandName(business.legalName).toLowerCase();
+  const rank = positions.findIndex(
+    (p) => extractBrandName(p.name).toLowerCase() === targetBrand,
   );
 
   return rank === -1 ? null : rank + 1;
@@ -106,6 +137,10 @@ export async function runAiAudit(
   const city = business.city;
   const queries = buildQueries(nicheLabel, city);
   const systemPrompt = buildSystemPrompt(city);
+
+  const brandName = extractBrandName(business.legalName);
+  logger.info(`  [AI] Brand name: "${brandName}" (extracted from "${business.legalName}")`);
+  logger.info(`  [AI] Queries in: ${toCroatianLocative(city)}`);
 
   const results: AiAuditResult['queries'] = [];
 

@@ -117,17 +117,35 @@ app.post('/api/deploy', (req: Request, res: Response) => {
 
   startSSE(res);
 
-  // Step 1: create dedicated Netlify site (ignore exit code — may already exist)
+  // Step 1: create dedicated Netlify site; collect output to detect "already exists"
+  let createOutput = '';
   const create = spawn('netlify', ['sites:create', '--name', slug], {
     cwd: process.cwd(),
     env: { ...process.env, NO_COLOR: '1' },
   });
 
-  create.stdout?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
-  create.stderr?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+  create.stdout?.on('data', (d: Buffer) => {
+    const text = d.toString();
+    createOutput += text;
+    sseWrite(res, { type: 'log', text });
+  });
+  create.stderr?.on('data', (d: Buffer) => {
+    const text = d.toString();
+    createOutput += text;
+    sseWrite(res, { type: 'log', text });
+  });
 
-  create.on('close', () => {
-    // Step 2: deploy to production
+  create.on('close', (createCode) => {
+    const alreadyExists = /already (exists|taken|in use)/i.test(createOutput);
+
+    if (createCode !== 0 && !alreadyExists) {
+      sseWrite(res, {
+        type: 'log',
+        text: `[deploy] sites:create exited ${createCode} — attempting deploy regardless...\n`,
+      });
+    }
+
+    // Step 2: deploy to production (runs only after create fully exits)
     const deploy = spawn(
       'netlify',
       ['deploy', '--prod', '--dir', `output/pages/${slug}`, '--site', slug],

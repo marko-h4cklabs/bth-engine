@@ -22,6 +22,7 @@ interface PlaceResult {
   displayName: { text: string };
   rating?: number;
   userRatingCount?: number;
+  types?: string[];
 }
 
 interface PlacesTextSearchResponse {
@@ -34,7 +35,7 @@ async function googleTextSearch(query: string, apiKey: string): Promise<PlaceRes
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount',
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.types',
     },
     body: JSON.stringify({ textQuery: query, languageCode: 'hr' }),
   });
@@ -60,8 +61,57 @@ function nameSimilar(a: string, b: string): boolean {
     normalize(b).includes(normalize(a).slice(0, 6));
 }
 
+// Place types that definitively flag a result as a non-service business
+const EXCLUDED_PLACE_TYPES = new Set([
+  'university', 'school', 'primary_school', 'secondary_school', 'junior_college',
+  'bank', 'atm', 'insurance_agency',
+  'real_estate_agency', 'car_dealer', 'car_repair', 'car_wash',
+  'government', 'city_hall', 'courthouse', 'embassy', 'local_government_office',
+  'supermarket', 'grocery_or_supermarket', 'convenience_store',
+  'parking', 'transit_station', 'bus_station', 'train_station',
+]);
+
+function getRelevantPlaceTypes(niche: string, nicheLabel: string): Set<string> {
+  const combined = `${niche} ${nicheLabel}`.toLowerCase();
+  const types = new Set<string>();
+
+  if (/zubar|dental|zub/.test(combined)) {
+    types.add('dentist'); types.add('doctor'); types.add('health');
+  }
+  if (/klinik|poliklinik|ordinacij|doktor|medicin|fiziotera|dermatolog|oftalmolog|ginekolog/.test(combined)) {
+    types.add('doctor'); types.add('hospital'); types.add('health'); types.add('physiotherapist');
+  }
+  if (/kozmetik|beauty|spa/.test(combined)) {
+    types.add('beauty_salon'); types.add('spa'); types.add('hair_care');
+  }
+  if (/salon|frizjer/.test(combined)) {
+    types.add('hair_care'); types.add('beauty_salon');
+  }
+  if (/gym|fitness|teretana|sport/.test(combined)) {
+    types.add('gym'); types.add('health');
+  }
+
+  return types;
+}
+
+function isRelevantCompetitor(types: string[], relevantTypes: Set<string>): boolean {
+  if (!types || types.length === 0) return true;
+  if (types.some((t) => EXCLUDED_PLACE_TYPES.has(t))) return false;
+  if (relevantTypes.size === 0) return true;
+  return types.some((t) => relevantTypes.has(t));
+}
+
+function getCompetitorQuery(nicheLabel: string, niche: string, city: string): string {
+  const combined = `${niche} ${nicheLabel}`.toLowerCase();
+  if (/zubar|dental|klinik|ordinacij|doktor|medicin|fiziotera/.test(combined)) {
+    return `${nicheLabel} ordinacija ${city}`;
+  }
+  return `${nicheLabel} privatna ${city}`;
+}
+
 async function fetchGoogleData(
   business: BusinessBase,
+  niche: string,
   nicheLabel: string,
   apiKey: string,
 ): Promise<GoogleData> {
@@ -81,14 +131,20 @@ async function fetchGoogleData(
   const targetName = target.displayName.text;
   logger.info(`  [Google] Found: "${targetName}" (${target.rating ?? 0}★, ${target.userRatingCount ?? 0} reviews)`);
 
-  logger.info(`  [Google] Searching competitors in niche "${nicheLabel}"...`);
-  const competitorResults = await googleTextSearch(
-    `${nicheLabel} ${business.city}`,
-    apiKey,
-  );
+  const competitorQuery = getCompetitorQuery(nicheLabel, niche, business.city);
+  logger.info(`  [Google] Competitor query: "${competitorQuery}"`);
+  const competitorResults = await googleTextSearch(competitorQuery, apiKey);
 
-  const competitors = competitorResults
+  const relevantTypes = getRelevantPlaceTypes(niche, nicheLabel);
+  const filtered = competitorResults
     .filter((r) => !nameSimilar(r.displayName.text, business.legalName))
+    .filter((r) => isRelevantCompetitor(r.types ?? [], relevantTypes));
+
+  if (filtered.length < 2) {
+    logger.warn(`  [Google] Only ${filtered.length} relevant competitor(s) found after type filtering — using whatever is available`);
+  }
+
+  const competitors = filtered
     .sort((a, b) => competitorScore(b) - competitorScore(a))
     .slice(0, 2)
     .map((r) => ({
@@ -250,7 +306,7 @@ export async function enrichBusinessData(
     logger.warn('[Google] GOOGLE_PLACES_API_KEY not set — skipping Google enrichment');
     googlePromise = Promise.resolve({ rating: 0, reviewCount: 0, placeId: '', competitors: [] });
   } else {
-    googlePromise = fetchGoogleData(business, nicheLabel, apiKey).catch((err) => {
+    googlePromise = fetchGoogleData(business, niche, nicheLabel, apiKey).catch((err) => {
       logger.warn(`[Google] Enrichment failed: ${err instanceof Error ? err.message : err}`);
       return { rating: 0, reviewCount: 0, placeId: '', competitors: [] };
     });
