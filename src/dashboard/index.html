@@ -401,7 +401,6 @@
       <div class="action-section" id="action-section" style="display:none">
         <div class="action-label">Akcije za trenutnog klijenta</div>
         <button class="btn btn-outline" id="btn-export">EXPORT</button>
-        <button class="btn btn-outline" id="btn-deploy">DEPLOY → NETLIFY</button>
         <button class="btn btn-outline" id="btn-open-pdf">OTVORI PDF</button>
 
         <div class="live-url" id="live-url" style="display:none">
@@ -453,7 +452,6 @@ const errorMsg        = document.getElementById('error-msg');
 const btnGenerate     = document.getElementById('btn-generate');
 const actionSection   = document.getElementById('action-section');
 const btnExport       = document.getElementById('btn-export');
-const btnDeploy       = document.getElementById('btn-deploy');
 const btnOpenPdf      = document.getElementById('btn-open-pdf');
 const liveUrl         = document.getElementById('live-url');
 const urlLink         = document.getElementById('url-link');
@@ -574,6 +572,11 @@ function extractSlugFromLog(text) {
   return m ? m[1] : null;
 }
 
+function extractLiveUrlFromLog(text) {
+  const m = text.match(/Live at:\s+(https:\/\/[^\s]+)/);
+  return m ? m[1] : null;
+}
+
 async function doGenerate() {
   hideError();
 
@@ -601,13 +604,20 @@ async function doGenerate() {
       }
       if (data.type === 'done') {
         if (data.success) {
-          currentSlug = extractSlugFromLog(logArea.textContent ?? '');
+          const logText = logArea.textContent ?? '';
+          currentSlug = extractSlugFromLog(logText);
+          const deployedUrl = extractLiveUrlFromLog(logText);
           setLogStatus('Gotovo! ✓', '#52A882');
           if (currentSlug) showActionButtons();
+          if (deployedUrl) {
+            urlLink.href = deployedUrl;
+            urlLink.textContent = deployedUrl;
+            liveUrl.style.display = 'block';
+          }
           loadClients();
         } else {
           setLogStatus('Pipeline nije uspio.', '#E05252');
-          appendLog('\n❌ Generiranje nije uspjelo — provjeri log.', '#E05252');
+          appendLog('\n❌ Generiranje nije uspjelo — provjeri log.');
         }
       }
     });
@@ -645,34 +655,6 @@ async function doExport(slug) {
     setLogStatus('Greška.', '#E05252');
   } finally {
     btnExport.disabled = false;
-  }
-}
-
-// ── Deploy ────────────────────────────────────────────────────────────────────
-
-async function doDeploy(slug) {
-  if (!slug) return;
-  clearLog();
-  liveUrl.style.display = 'none';
-  setLogStatus('Deploy se izvodi…', '#C9A227');
-  btnDeploy.disabled = true;
-
-  try {
-    await streamPost('/api/deploy', { slug }, (data) => {
-      if (data.type === 'log') appendLog(data.text);
-      if (data.type === 'url') {
-        urlLink.href = data.url;
-        urlLink.textContent = data.url;
-        liveUrl.style.display = 'block';
-      }
-      if (data.type === 'done') {
-        setLogStatus(data.success ? 'Deploy gotov! ✓' : 'Deploy nije uspio.', data.success ? '#52A882' : '#E05252');
-      }
-    });
-  } catch (err) {
-    setLogStatus('Greška.', '#E05252');
-  } finally {
-    btnDeploy.disabled = false;
   }
 }
 
@@ -795,10 +777,6 @@ function renderClients(clients) {
                   onclick="event.stopPropagation(); doOpenPdf('${c.slug}')">
                   PDF
                 </button>
-                <button class="btn btn-outline btn-sm"
-                  onclick="event.stopPropagation(); doDeploy('${c.slug}')">
-                  DEPLOY
-                </button>
               </div>
             </div>
           </td>
@@ -878,7 +856,6 @@ btnClearLog.addEventListener('click', () => {
 btnRefresh.addEventListener('click', loadClients);
 
 btnExport.addEventListener('click', () => doExport(currentSlug));
-btnDeploy.addEventListener('click', () => doDeploy(currentSlug));
 btnOpenPdf.addEventListener('click', () => doOpenPdf(currentSlug));
 
 // ── Init ──────────────────────────────────────────────────────────────────────

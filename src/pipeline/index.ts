@@ -4,6 +4,7 @@ import { getNiche, upsertClient } from '../db/client.js';
 import { getConfigSafe } from '../utils/config.js';
 import { generateQrBase64 } from '../utils/qr.js';
 import { scrapeCompanyWall } from './1-scraper.js';
+import { scrapeFinancials } from './1b-financials.js';
 import { enrichBusinessData } from './2-enrichment.js';
 import { runAiAudit } from './3-auditor.js';
 import { assembleDossierData, composePdf } from './4-composer.js';
@@ -35,6 +36,30 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     logger.warn('Page 1 competitor table will have empty data.');
     logger.warn('Get a key: console.cloud.google.com → Places API');
     logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  }
+
+  // ── Step 1b — Financial scrape ────────────────────────────────────────────
+  logger.section('Step 1b — Financial data');
+  let financials;
+  try {
+    financials = await scrapeFinancials(input.companyWallUrl);
+    if (financials.years.length > 0) {
+      const latest = financials.years[0]!;
+      logger.data('Latest year',   String(latest.year));
+      logger.data('Revenue',       `€${latest.revenue.toLocaleString('hr-HR')}`);
+      logger.data('Profit trend',  financials.profitTrend);
+      logger.data('Employees',     String(financials.employeeCount));
+      logger.data('Est. budget',   `€${financials.estimatedMarketingBudget.toLocaleString('hr-HR')}`);
+    } else {
+      logger.warn('  No financial data available for this company');
+    }
+  } catch (err) {
+    logger.warn(`Step 1b failed (non-fatal): ${err instanceof Error ? err.message : err}`);
+    financials = {
+      years: [], revenueGrowth: 0, profitTrend: 'stable' as const,
+      employeeCount: 0, estimatedMarketingBudget: 0, currentDigitalSpend: 0,
+      dataSource: 'companywall' as const,
+    };
   }
 
   // ── Step 2 — Enrich data ──────────────────────────────────────────────────
@@ -72,7 +97,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
 
   const slug = clientSlug(business.legalName, business.city);
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const output: PipelineOutput = { business, google, meta, googleAds, audit, slug };
+  const output: PipelineOutput = { business, google, meta, googleAds, financials, audit, slug };
 
   // ── Step 4 — Landing page HTML ───────────────────────────────────────────
   // QR is not in the landing page HTML — assemble dossier with empty QR so

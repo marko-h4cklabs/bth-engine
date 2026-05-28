@@ -47,6 +47,29 @@ export interface GoogleAdsData {
   }>;
 }
 
+export interface YearlyFinancials {
+  year: number;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  capital: number;
+  assets: number;
+  shortTermDebt: number;
+  longTermDebt: number;
+  employees: number;
+  avgBruttoSalary: number;
+}
+
+export interface FinancialData {
+  years: YearlyFinancials[];        // up to 3 years, newest first
+  revenueGrowth: number;            // % change oldest → newest
+  profitTrend: 'growing' | 'declining' | 'stable' | 'loss';
+  employeeCount: number;
+  estimatedMarketingBudget: number; // 5% of latest revenue
+  currentDigitalSpend: number;      // always 0 — unknown, flagged
+  dataSource: 'companywall';
+}
+
 export interface AiAuditResult {
   queries: Array<{
     query: string;
@@ -72,6 +95,7 @@ export interface PipelineOutput {
   google: GoogleData;
   meta: MetaAdData;
   googleAds: GoogleAdsData;
+  financials: FinancialData;
   audit: AiAuditResult;
   slug: string;
   pdfPath?: string;
@@ -117,6 +141,10 @@ export interface DossierData {
 
   caseStudyNiche: string;
   caseStudyResult: string;
+
+  financials: FinancialData;
+  page2PainStatement: string;
+  estimatedMonthlyLoss: number;
 
   qrCodeBase64: string;
 }

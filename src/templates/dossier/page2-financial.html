@@ -1,0 +1,92 @@
+<div class="page">
+
+  <div class="page-header">
+    <span class="page-header-agency">{{agencyName}}</span>
+    <span class="page-header-client">{{legalName}}</span>
+  </div>
+
+  <div class="section-label">
+    <div class="section-label-line"></div>
+    <div class="section-label-text">— Financijska Inteligencija —</div>
+    <div class="section-label-line"></div>
+  </div>
+
+  <div class="page-hero-sm">Što nam govore vaši financijski podaci</div>
+  <div style="font-family:'Outfit',sans-serif;font-size:9px;color:rgba(240,237,230,0.40);margin-bottom:10px;flex-shrink:0">
+    Javno dostupni podaci — Fina / CompanyWall — zadnje 3 godine poslovanja
+  </div>
+
+  <div class="gold-line"></div>
+
+  <!-- Two-column layout -->
+  <div style="display:flex;gap:14px;flex:1;min-height:0;margin-bottom:10px">
+
+    <!-- Left column: Chart (57%) -->
+    <div style="flex:0 0 57%;display:flex;flex-direction:column">
+
+      <div class="label" style="margin-bottom:8px">— Prihodi i dobit —</div>
+
+      {{financialChartHtml}}
+
+      <!-- Profit trend indicator -->
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <span style="font-family:'Cinzel',serif;font-size:7px;color:rgba(240,237,230,0.40);letter-spacing:0.2em;text-transform:uppercase">Trend dobiti:</span>
+        <span style="font-family:'CormorantGaramond',Georgia,serif;font-size:12pt;font-style:italic;color:{{fin_trendColor}}">
+          {{fin_trendArrow}} {{fin_trendText}}
+        </span>
+      </div>
+
+    </div>
+
+    <!-- Right column: Metric cards (38%) -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+
+      <!-- Card 1: Revenue -->
+      <div class="card card-accent" style="flex:1">
+        <div class="label">Ukupni prihodi {{fin_latestYear}}</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-size:20pt;font-weight:500;font-style:italic;color:rgba(240,237,230,0.95);line-height:1.1;margin:4px 0">{{fin_latestRevenue}}</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:8px;color:{{fin_revenueGrowthColor}}">{{fin_revenueGrowthArrow}} {{fin_revenueGrowth}} vs {{fin_oldestYear}}</div>
+      </div>
+
+      <!-- Card 2: Profit -->
+      <div class="card card-accent" style="flex:1">
+        <div class="label">Dobit / gubitak {{fin_latestYear}}</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-size:20pt;font-weight:500;font-style:italic;color:{{fin_profitColor}};line-height:1.1;margin:4px 0">{{fin_profitSign}}{{fin_latestProfit}}</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:8px;color:rgba(240,237,230,0.40)">{{fin_trendText}}</div>
+      </div>
+
+      <!-- Card 3: Employees -->
+      <div class="card card-accent" style="flex:1">
+        <div class="label">Zaposlenici</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-size:20pt;font-weight:500;font-style:italic;color:rgba(240,237,230,0.95);line-height:1.1;margin:4px 0">{{fin_employees}}</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:8px;color:rgba(240,237,230,0.40)">Prosj. bruto plaća: {{fin_avgSalary}}/mj</div>
+      </div>
+
+      <!-- Card 4: Marketing potential (gold border) -->
+      <div style="background:#141210;border:1px solid rgba(201,162,39,0.5);padding:10px 12px;flex:1">
+        <div class="label">Marketinški potencijal</div>
+        <div style="font-family:'Fraunces',Georgia,serif;font-size:17pt;font-weight:500;font-style:italic;color:#C9A227;line-height:1.1;margin:4px 0">{{fin_marketingBudget}}/god</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:7px;color:rgba(240,237,230,0.40);line-height:1.4">Procjena: 5% prihoda · industrijski standard<br>Trenutna digitalna potrošnja: €0</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Argument block — full width -->
+  <div style="background:#141210;border:1px solid rgba(201,162,39,0.3);padding:11px 14px;flex-shrink:0">
+    <div style="font-family:'Cinzel',serif;font-size:8px;color:#C9A227;letter-spacing:0.3em;text-transform:uppercase;text-align:center;margin-bottom:8px">— Zaključak —</div>
+    <div style="font-family:'CormorantGaramond',Georgia,serif;font-size:10pt;font-style:italic;color:rgba(240,237,230,0.95);text-align:center;line-height:1.55;margin-bottom:8px">{{page2PainStatement}}</div>
+    <div style="font-family:'Outfit',sans-serif;font-weight:600;font-size:9pt;color:#C9A227;text-align:center;line-height:1.4">
+      Svaki mjesec bez digitalnog marketinga košta vas procijenjeno {{fin_monthlyLoss}} u propuštenim prihodima.
+    </div>
+  </div>
+
+  <div style="margin-top:auto;padding-top:7px;border-top:1px solid rgba(201,162,39,0.2);flex-shrink:0">
+    <span style="font-family:'Outfit',sans-serif;font-size:7px;color:rgba(240,237,230,0.30);letter-spacing:0.12em;text-transform:uppercase">
+      Povjerljivo — Pripremljeno isključivo za {{legalName}}
+    </span>
+  </div>
+
+  <div class="page-num">2</div>
+
+</div>

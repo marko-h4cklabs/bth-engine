@@ -7,7 +7,7 @@ import { pathToFileURL } from 'url';
 import { logger } from '../utils/logger.js';
 import { getFontFaceCSS } from '../utils/fonts.js';
 import { getCaseStudyForNiche } from '../db/client.js';
-import type { PipelineOutput, DossierData, AiAuditResult } from '../types/index.js';
+import type { PipelineOutput, DossierData, AiAuditResult, FinancialData } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -219,6 +219,87 @@ function selectBestQuery(audit: AiAuditResult): { query: string; response: strin
   return { query: best.query, response: best.response };
 }
 
+// ── Financial helpers ──────────────────────────────────────────────────────────
+
+function formatEur(n: number): string {
+  if (n >= 1_000_000) return `€${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `€${Math.round(n / 1_000).toLocaleString('hr-HR')}K`;
+  if (n === 0) return '€0';
+  return `€${Math.round(n).toLocaleString('hr-HR')}`;
+}
+
+function buildFinancialChart(fin: FinancialData): string {
+  if (fin.years.length === 0) {
+    return `<div style="text-align:center;padding:20px;color:rgba(240,237,230,0.30);font-family:'Outfit',sans-serif;font-size:9px">Financijski podaci nisu dostupni</div>`;
+  }
+
+  // Chart shows years left→right (oldest first)
+  const years = [...fin.years].reverse();
+  const maxRevenue = Math.max(...years.map((y) => y.revenue), 1);
+  const chartH = 110; // px — inner bar area
+
+  const cols = years.map((y) => {
+    const barPct = maxRevenue > 0 ? Math.max(4, (y.revenue / maxRevenue) * 100) : 4;
+    // Profit dot: position within bar height (0 = bottom of bar, barPct = top)
+    const profitPct = maxRevenue > 0
+      ? Math.min(barPct, Math.max(0, (Math.abs(y.profit) / maxRevenue) * 100))
+      : 0;
+    const profitColor = y.profit >= 0 ? '#52A882' : '#E05252';
+    const sign = y.profit >= 0 ? '+' : '-';
+
+    return `
+<div style="flex:1;display:flex;flex-direction:column;align-items:center">
+  <div style="font-family:'Outfit',sans-serif;font-size:6.5px;color:#C9A227;margin-bottom:3px;text-align:center">${formatEur(y.revenue)}</div>
+  <div style="width:100%;height:${chartH}px;display:flex;align-items:flex-end;padding:0 6px;position:relative">
+    <div style="width:100%;height:${barPct}%;background:rgba(201,162,39,0.35);border-top:2px solid #C9A227;min-height:4px;position:relative">
+      <div style="position:absolute;top:0;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:${profitColor};border:1px solid ${profitColor === '#52A882' ? '#3a8a66' : '#b03a3a'}"></div>
+    </div>
+  </div>
+  <div style="font-family:'Outfit',sans-serif;font-size:7px;color:rgba(240,237,230,0.55);margin-top:4px;text-align:center">
+    ${y.year}<br><span style="color:${profitColor}">${sign}${formatEur(Math.abs(y.profit))}</span>
+  </div>
+</div>`;
+  });
+
+  return `
+<div style="display:flex;gap:8px;align-items:stretch">
+  ${cols.join('')}
+</div>
+<div style="display:flex;justify-content:center;gap:14px;margin-top:6px">
+  <div style="display:flex;align-items:center;gap:4px">
+    <div style="width:12px;height:8px;background:rgba(201,162,39,0.35);border-top:2px solid #C9A227"></div>
+    <span style="font-family:'Outfit',sans-serif;font-size:6.5px;color:rgba(240,237,230,0.40)">Prihod</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:4px">
+    <div style="width:7px;height:7px;border-radius:50%;background:#52A882"></div>
+    <span style="font-family:'Outfit',sans-serif;font-size:6.5px;color:rgba(240,237,230,0.40)">Dobit</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:4px">
+    <div style="width:7px;height:7px;border-radius:50%;background:#E05252"></div>
+    <span style="font-family:'Outfit',sans-serif;font-size:6.5px;color:rgba(240,237,230,0.40)">Gubitak</span>
+  </div>
+</div>`;
+}
+
+function buildPage2PainStatement(fin: FinancialData): string {
+  const latest = fin.years[0];
+  if (!latest || latest.revenue === 0) {
+    return 'Financijski podaci za ovu tvrtku nisu javno dostupni.';
+  }
+  const emp = latest.employees > 0 ? ` s ${latest.employees} zaposlenika` : '';
+  return `Vaša firma ostvaruje ${formatEur(latest.revenue)} prihoda godišnje${emp}. Prema industrijskim standardima, to podrazumijeva marketinški budžet od ${formatEur(fin.estimatedMarketingBudget)} godišnje. Trenutno: €0 u digitalnoj akviziciji.`;
+}
+
+function trendText(t: FinancialData['profitTrend']): string {
+  return { growing: 'Rast', declining: 'Pad', stable: 'Stabilno', loss: 'Gubitak' }[t];
+}
+function trendArrow(t: FinancialData['profitTrend']): string {
+  return { growing: '↑', declining: '↓', stable: '→', loss: '⚠' }[t];
+}
+function trendColor(t: FinancialData['profitTrend']): string {
+  return { growing: '#52A882', declining: '#E05252', stable: '#C9A227', loss: '#E05252' }[t];
+}
+
 // ── DossierData assembly ──────────────────────────────────────────────────────
 
 export function assembleDossierData(
@@ -228,7 +309,7 @@ export function assembleDossierData(
   landingPageUrl: string,
   qrCodeBase64: string,
 ): DossierData {
-  const { business, google, meta, audit, slug } = output;
+  const { business, google, meta, audit, slug, financials } = output;
 
   const comp1 = google.competitors[0];
   const comp2 = google.competitors[1];
@@ -277,6 +358,10 @@ export function assembleDossierData(
       : nicheLabel,
     caseStudyResult: caseStudy?.resultMetric
       ?? '[Case study u pripremi — kontaktirajte nas za referencu]',
+
+    financials,
+    page2PainStatement: buildPage2PainStatement(financials),
+    estimatedMonthlyLoss: Math.round((financials.estimatedMarketingBudget / 12) * 3),
 
     qrCodeBase64,
   };
@@ -455,10 +540,14 @@ export async function composePdf(
 ): Promise<string> {
   logger.info('  Reading page templates...');
 
-  const pages = [1, 2, 3, 4, 5].map((n) => {
-    const path = resolve(TEMPLATES_DIR, `page${n}.html`);
-    return readFileSync(path, 'utf-8');
-  });
+  const pages = [
+    'page1.html',
+    'page2-financial.html',
+    'page2.html',
+    'page3.html',
+    'page4.html',
+    'page5.html',
+  ].map((name) => readFileSync(resolve(TEMPLATES_DIR, name), 'utf-8'));
 
   const tokens: Record<string, string> = {
     // Identity
@@ -491,6 +580,26 @@ export async function composePdf(
 
     // QR
     qrCodeBase64: data.qrCodeBase64,
+
+    // Page 2 — financial intelligence
+    financialChartHtml:    buildFinancialChart(data.financials),
+    page2PainStatement:    escapeHtml(data.page2PainStatement),
+    fin_latestYear:        String(data.financials.years[0]?.year ?? '—'),
+    fin_oldestYear:        String(data.financials.years[data.financials.years.length - 1]?.year ?? '—'),
+    fin_latestRevenue:     data.financials.years[0]?.revenue ? formatEur(data.financials.years[0].revenue) : '—',
+    fin_revenueGrowth:     `${data.financials.revenueGrowth >= 0 ? '+' : ''}${data.financials.revenueGrowth.toFixed(1)}%`,
+    fin_revenueGrowthColor: data.financials.revenueGrowth >= 0 ? '#52A882' : '#E05252',
+    fin_revenueGrowthArrow: data.financials.revenueGrowth >= 0 ? '↑' : '↓',
+    fin_latestProfit:      data.financials.years[0]?.profit !== undefined ? formatEur(Math.abs(data.financials.years[0].profit)) : '—',
+    fin_profitSign:        (data.financials.years[0]?.profit ?? 0) < 0 ? '- ' : '',
+    fin_profitColor:       (data.financials.years[0]?.profit ?? 0) >= 0 ? '#52A882' : '#E05252',
+    fin_trendText:         trendText(data.financials.profitTrend),
+    fin_trendArrow:        trendArrow(data.financials.profitTrend),
+    fin_trendColor:        trendColor(data.financials.profitTrend),
+    fin_employees:         data.financials.employeeCount > 0 ? String(data.financials.employeeCount) : 'N/A',
+    fin_avgSalary:         data.financials.years[0]?.avgBruttoSalary ? formatEur(data.financials.years[0].avgBruttoSalary) : 'N/A',
+    fin_marketingBudget:   data.financials.estimatedMarketingBudget > 0 ? formatEur(data.financials.estimatedMarketingBudget) : '—',
+    fin_monthlyLoss:       data.estimatedMonthlyLoss > 0 ? formatEur(data.estimatedMonthlyLoss) : '—',
   };
 
   const html = buildDocumentHtml(pages, tokens);
