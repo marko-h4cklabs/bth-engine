@@ -51,6 +51,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.post('/track', async (req, res) => {
   const { slug, businessName, directorName, visibilityScore, verdict, timestamp, userAgent } = req.body as {
     slug?: string;
