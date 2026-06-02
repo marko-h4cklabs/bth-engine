@@ -26,6 +26,10 @@ export function getDb(): Database.Database {
 
   // Idempotent migrations for existing databases
   try { _db.exec('ALTER TABLE clients ADD COLUMN videoUrl TEXT'); } catch { /* column already exists */ }
+  try { _db.exec('ALTER TABLE clients ADD COLUMN competitor1Url TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE clients ADD COLUMN competitor2Url TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE clients ADD COLUMN competitor1Name TEXT'); } catch {}
+  try { _db.exec('ALTER TABLE clients ADD COLUMN competitor2Name TEXT'); } catch {}
 
   return _db;
 }
@@ -58,6 +62,10 @@ export function upsertClient(data: Omit<ClientRecord, 'id' | 'createdAt' | 'upda
         pageVisitedAt    = ?,
         pageVisitCount   = ?,
         notes            = ?,
+        competitor1Url   = ?,
+        competitor2Url   = ?,
+        competitor1Name  = ?,
+        competitor2Name  = ?,
         updatedAt        = ?
       WHERE slug = ?
     `).run(
@@ -66,7 +74,10 @@ export function upsertClient(data: Omit<ClientRecord, 'id' | 'createdAt' | 'upda
       data.pdfPath ?? null, data.landingPageUrl ?? null,
       data.visibilityScore ?? null, data.verdict ?? null,
       data.pageVisitedAt ?? null, data.pageVisitCount,
-      data.notes ?? null, ts, data.slug,
+      data.notes ?? null,
+      data.competitor1Url ?? null, data.competitor2Url ?? null,
+      data.competitor1Name ?? null, data.competitor2Name ?? null,
+      ts, data.slug,
     );
     // Preserve videoUrl on upsert — only updateClientVideoUrl changes it
   } else {
@@ -74,15 +85,20 @@ export function upsertClient(data: Omit<ClientRecord, 'id' | 'createdAt' | 'upda
       INSERT INTO clients (
         slug, businessName, oib, directorFullName, niche, city, status,
         pdfPath, landingPageUrl, visibilityScore, verdict,
-        pageVisitedAt, pageVisitCount, notes, createdAt, updatedAt
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        pageVisitedAt, pageVisitCount, notes,
+        competitor1Url, competitor2Url, competitor1Name, competitor2Name,
+        createdAt, updatedAt
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       data.slug, data.businessName, data.oib ?? null, data.directorFullName ?? null,
       data.niche, data.city, data.status,
       data.pdfPath ?? null, data.landingPageUrl ?? null,
       data.visibilityScore ?? null, data.verdict ?? null,
       data.pageVisitedAt ?? null, data.pageVisitCount,
-      data.notes ?? null, data.createdAt ?? ts, ts,
+      data.notes ?? null,
+      data.competitor1Url ?? null, data.competitor2Url ?? null,
+      data.competitor1Name ?? null, data.competitor2Name ?? null,
+      data.createdAt ?? ts, ts,
     );
   }
 

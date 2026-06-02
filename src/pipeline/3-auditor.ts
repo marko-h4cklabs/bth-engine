@@ -64,7 +64,7 @@ const LEGAL_SUFFIX_RE = /\s+(d\.o\.o\.?|d\.d\.?|j\.d\.o\.o\.?|j\.t\.d\.?|k\.d\.?
 // "POLIKLINIKA BAGATIN d.o.o." → "Bagatin"
 // "DENTAL FABRIQUE LAB d.o.o." → "Dental Fabrique Lab"
 // "SRNEC TEKSTIL d.o.o." → "Srnec Tekstil"
-function extractBrandName(legalName: string): string {
+export function extractBrandName(legalName: string): string {
   const withoutLegal = legalName.replace(LEGAL_SUFFIX_RE, '').trim();
   const words = withoutLegal
     .split(/[\s\-\/,.()+]+/)

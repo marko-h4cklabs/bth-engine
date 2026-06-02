@@ -393,6 +393,18 @@
         </select>
       </div>
 
+      <div class="field">
+        <label>Konkurent 1 (neobavezno)</label>
+        <input type="text" id="competitor1-input"
+          placeholder="https://www.companywall.hr/tvrtka/konkurent-1/AbCd">
+      </div>
+
+      <div class="field">
+        <label>Konkurent 2 (neobavezno)</label>
+        <input type="text" id="competitor2-input"
+          placeholder="https://www.companywall.hr/tvrtka/konkurent-2/AbCd">
+      </div>
+
       <div id="error-msg" class="error-msg" style="display:none"></div>
 
       <button class="btn btn-gold" id="btn-generate">◆&nbsp; KRENI</button>
@@ -585,6 +597,8 @@ async function doGenerate() {
 
   const url = urlInput.value.trim();
   const niche = nicheSelect.value;
+  const competitor1 = document.getElementById('competitor1-input').value.trim() || null;
+  const competitor2 = document.getElementById('competitor2-input').value.trim() || null;
 
   if (!url) { showError('Unesite CompanyWall URL.'); return; }
   if (!url.includes('companywall.hr')) { showError('URL mora biti s companywall.hr'); return; }
@@ -605,7 +619,7 @@ async function doGenerate() {
   let foundUrl = null;
 
   try {
-    await streamPost('/api/generate', { companyWallUrl: url, niche }, (data) => {
+    await streamPost('/api/generate', { companyWallUrl: url, niche, competitor1Url: competitor1, competitor2Url: competitor2 }, (data) => {
       if (data.type === 'log') {
         appendLog(data.text);
         // Extract from the raw message text — newlines terminate matches cleanly

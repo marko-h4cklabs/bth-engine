@@ -50,10 +50,14 @@ program
   .requiredOption('--niche <slug>', 'Business niche slug (e.g. estetska-medicina)')
   .option('--deploy', 'Deploy landing page after generation')
   .option('--dry-run', 'Run all steps, print output, skip PDF and deploy')
+  .option('--competitor1 <url>', 'CompanyWall URL for manual competitor 1')
+  .option('--competitor2 <url>', 'CompanyWall URL for manual competitor 2')
   .action(async (companyWallUrl: string, opts: {
     niche: string;
     deploy?: boolean;
     dryRun?: boolean;
+    competitor1?: string;
+    competitor2?: string;
   }) => {
     logger.section('BTH Generate');
     logger.info(`URL:   ${chalk.bold(companyWallUrl)}`);
@@ -67,6 +71,8 @@ program
         niche: opts.niche,
         ...(opts.deploy !== undefined && { deploy: opts.deploy }),
         ...(opts.dryRun !== undefined && { dryRun: opts.dryRun }),
+        competitor1Url: opts.competitor1 ?? null,
+        competitor2Url: opts.competitor2 ?? null,
       });
     } catch (err) {
       logger.error('Pipeline failed:', err instanceof Error ? err.message : err);

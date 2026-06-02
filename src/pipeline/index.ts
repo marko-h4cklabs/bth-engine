@@ -7,6 +7,7 @@ import { scrapeCompanyWall } from './1-scraper.js';
 import { scrapeFinancials } from './1b-financials.js';
 import { enrichBusinessData } from './2-enrichment.js';
 import { runAiAudit } from './3-auditor.js';
+import { scrapeManualCompetitor } from './competitors.js';
 import { assembleDossierData, composePdf } from './4-composer.js';
 import { generateLandingPage } from '../landing/generator.js';
 import { deployLandingPage } from '../landing/deployer.js';
@@ -95,9 +96,31 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   logger.data('Verdict',              audit.verdict);
   logger.data('Top competitor in AI', audit.topCompetitorInAI || 'none detected');
 
+  // ── Step 3b — Manual competitors ─────────────────────────────────────────
+  let manualCompetitor1 = null;
+  let manualCompetitor2 = null;
+  if (input.competitor1Url || input.competitor2Url) {
+    logger.section('Step 3b — Manual competitor scraping');
+    const auditResponses = audit.queries.map(q => q.response);
+    const [c1, c2] = await Promise.all([
+      input.competitor1Url ? scrapeManualCompetitor(input.competitor1Url, input.niche, nicheLabel, auditResponses).catch(err => {
+        logger.warn(`Competitor 1 failed: ${err instanceof Error ? err.message : err}`);
+        return null;
+      }) : Promise.resolve(null),
+      input.competitor2Url ? scrapeManualCompetitor(input.competitor2Url, input.niche, nicheLabel, auditResponses).catch(err => {
+        logger.warn(`Competitor 2 failed: ${err instanceof Error ? err.message : err}`);
+        return null;
+      }) : Promise.resolve(null),
+    ]);
+    manualCompetitor1 = c1;
+    manualCompetitor2 = c2;
+    if (c1) logger.data('Competitor 1', c1.legalName);
+    if (c2) logger.data('Competitor 2', c2.legalName);
+  }
+
   const slug = clientSlug(business.legalName, business.city);
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
-  const output: PipelineOutput = { business, google, meta, googleAds, financials, audit, slug };
+  const output: PipelineOutput = { business, google, meta, googleAds, financials, audit, slug, manualCompetitor1, manualCompetitor2 };
 
   // ── Step 4 — Landing page HTML ───────────────────────────────────────────
   // QR is not in the landing page HTML — assemble dossier with empty QR so
@@ -186,6 +209,10 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     pageVisitCount: 0,
     notes: null,
     videoUrl: null,
+    competitor1Url: input.competitor1Url ?? null,
+    competitor2Url: input.competitor2Url ?? null,
+    competitor1Name: manualCompetitor1?.legalName ?? google.competitors[0]?.name ?? null,
+    competitor2Name: manualCompetitor2?.legalName ?? google.competitors[1]?.name ?? null,
   });
 
   // ── Done ──────────────────────────────────────────────────────────────────

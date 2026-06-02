@@ -74,7 +74,12 @@ function spawnSSE(
 // ── POST /api/generate ────────────────────────────────────────────────────────
 
 app.post('/api/generate', (req: Request, res: Response) => {
-  const { companyWallUrl, niche } = req.body as { companyWallUrl?: string; niche?: string };
+  const { companyWallUrl, niche, competitor1Url, competitor2Url } = req.body as {
+    companyWallUrl?: string;
+    niche?: string;
+    competitor1Url?: string | null;
+    competitor2Url?: string | null;
+  };
 
   if (!companyWallUrl || !niche) {
     res.status(400).json({ error: 'Missing companyWallUrl or niche' });
@@ -82,7 +87,10 @@ app.post('/api/generate', (req: Request, res: Response) => {
   }
 
   startSSE(res);
-  spawnSSE(res, TSX, ['src/cli.ts', 'generate', companyWallUrl, '--niche', niche], (code) => {
+  const args = ['src/cli.ts', 'generate', companyWallUrl, '--niche', niche];
+  if (competitor1Url) args.push('--competitor1', competitor1Url);
+  if (competitor2Url) args.push('--competitor2', competitor2Url);
+  spawnSSE(res, TSX, args, (code) => {
     sseWrite(res, { type: 'done', success: code === 0 });
     res.end();
   });

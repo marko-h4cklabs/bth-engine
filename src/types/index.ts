@@ -47,6 +47,22 @@ export interface GoogleAdsData {
   }>;
 }
 
+export interface ManualCompetitorData {
+  companyWallUrl: string;
+  legalName: string;
+  directorFullName: string;
+  googleRating: number;
+  googleReviewCount: number;
+  metaAdsRunning: boolean;
+  metaAdCount: number;
+  googleAdsRunning: boolean;
+  googleAdCount: number;
+  aiMentionCount: number;
+  aiVisibilityScore: number;
+  aiVerdict: string;
+  financials: FinancialData | null;
+}
+
 export interface YearlyFinancials {
   year: number;
   revenue: number;
@@ -88,6 +104,8 @@ export interface PipelineInput {
   niche: string;
   dryRun?: boolean;
   deploy?: boolean;
+  competitor1Url?: string | null;
+  competitor2Url?: string | null;
 }
 
 export interface PipelineOutput {
@@ -100,6 +118,8 @@ export interface PipelineOutput {
   slug: string;
   pdfPath?: string;
   landingPageUrl?: string;
+  manualCompetitor1: ManualCompetitorData | null;
+  manualCompetitor2: ManualCompetitorData | null;
 }
 
 export interface DossierData {
@@ -130,6 +150,17 @@ export interface DossierData {
   targetGoogleAdCount: number;
   competitor1RunningGoogleAds: boolean;
   competitor2RunningGoogleAds: boolean;
+
+  competitor1MetaAdCount: number;
+  competitor2MetaAdCount: number;
+  competitor1GoogleAdCount: number;
+  competitor2GoogleAdCount: number;
+  competitor1AiScore: number;
+  competitor2AiScore: number;
+  competitor1AiVerdict: string;
+  competitor2AiVerdict: string;
+  manualCompetitor1: ManualCompetitorData | null;
+  manualCompetitor2: ManualCompetitorData | null;
 
   visibilityScore: number;
   verdict: string;
@@ -177,6 +208,10 @@ export interface ClientRecord {
   pageVisitCount: number;
   notes: string | null;
   videoUrl: string | null;
+  competitor1Url: string | null;
+  competitor2Url: string | null;
+  competitor1Name: string | null;
+  competitor2Name: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -309,12 +309,41 @@ export function assembleDossierData(
   landingPageUrl: string,
   qrCodeBase64: string,
 ): DossierData {
-  const { business, google, meta, audit, slug, financials } = output;
+  const { business, google, meta, audit, slug, financials, manualCompetitor1, manualCompetitor2 } = output;
 
-  const comp1 = google.competitors[0];
-  const comp2 = google.competitors[1];
+  const autoComp1 = manualCompetitor1 ? null : google.competitors[0];
+  const autoComp2 = manualCompetitor2 ? null : google.competitors[1];
   const caseStudy = getCaseStudyForNiche(niche);
   const bestQuery = selectBestQuery(audit);
+
+  function compAiScore(compName: string): number {
+    if (!compName || compName === '—') return 0;
+    const mentions = audit.queries.filter(q => q.competitorsMentioned.includes(compName)).length;
+    return Math.round((mentions / Math.max(audit.queries.length, 1)) * 100);
+  }
+  function compAiVerdict(score: number): string {
+    return score === 0 ? 'INVISIBLE' : score <= 40 ? 'WEAK' : score <= 80 ? 'PRESENT' : 'DOMINANT';
+  }
+
+  const comp1Name = manualCompetitor1?.legalName ?? autoComp1?.name ?? '—';
+  const comp1Rating = manualCompetitor1?.googleRating ?? autoComp1?.rating ?? 0;
+  const comp1ReviewCount = manualCompetitor1?.googleReviewCount ?? autoComp1?.reviewCount ?? 0;
+  const comp1MetaRunning = manualCompetitor1?.metaAdsRunning ?? (meta.competitorAds[0]?.isRunningAds ?? false);
+  const comp1MetaCount = manualCompetitor1?.metaAdCount ?? (meta.competitorAds[0]?.activeAdCount ?? 0);
+  const comp1GoogleRunning = manualCompetitor1?.googleAdsRunning ?? (output.googleAds.competitorAds[0]?.isRunningAds ?? false);
+  const comp1GoogleCount = manualCompetitor1?.googleAdCount ?? (output.googleAds.competitorAds[0]?.adCount ?? 0);
+  const comp1AiScore = manualCompetitor1?.aiVisibilityScore ?? compAiScore(autoComp1?.name ?? '');
+  const comp1AiVerdict = manualCompetitor1?.aiVerdict ?? compAiVerdict(comp1AiScore);
+
+  const comp2Name = manualCompetitor2?.legalName ?? autoComp2?.name ?? '—';
+  const comp2Rating = manualCompetitor2?.googleRating ?? autoComp2?.rating ?? 0;
+  const comp2ReviewCount = manualCompetitor2?.googleReviewCount ?? autoComp2?.reviewCount ?? 0;
+  const comp2MetaRunning = manualCompetitor2?.metaAdsRunning ?? (meta.competitorAds[1]?.isRunningAds ?? false);
+  const comp2MetaCount = manualCompetitor2?.metaAdCount ?? (meta.competitorAds[1]?.activeAdCount ?? 0);
+  const comp2GoogleRunning = manualCompetitor2?.googleAdsRunning ?? (output.googleAds.competitorAds[1]?.isRunningAds ?? false);
+  const comp2GoogleCount = manualCompetitor2?.googleAdCount ?? (output.googleAds.competitorAds[1]?.adCount ?? 0);
+  const comp2AiScore = manualCompetitor2?.aiVisibilityScore ?? compAiScore(autoComp2?.name ?? '');
+  const comp2AiVerdict = manualCompetitor2?.aiVerdict ?? compAiVerdict(comp2AiScore);
 
   return {
     slug,
@@ -329,22 +358,33 @@ export function assembleDossierData(
 
     targetRating: google.rating,
     targetReviewCount: google.reviewCount,
-    competitor1Name: comp1?.name ?? '—',
-    competitor1Rating: comp1?.rating ?? 0,
-    competitor1ReviewCount: comp1?.reviewCount ?? 0,
-    competitor2Name: comp2?.name ?? '—',
-    competitor2Rating: comp2?.rating ?? 0,
-    competitor2ReviewCount: comp2?.reviewCount ?? 0,
+    competitor1Name: comp1Name,
+    competitor1Rating: comp1Rating,
+    competitor1ReviewCount: comp1ReviewCount,
+    competitor2Name: comp2Name,
+    competitor2Rating: comp2Rating,
+    competitor2ReviewCount: comp2ReviewCount,
 
     targetRunningAds: meta.isRunningAds,
     targetAdCount: meta.activeAdCount,
-    competitor1RunningAds: meta.competitorAds[0]?.isRunningAds ?? false,
-    competitor2RunningAds: meta.competitorAds[1]?.isRunningAds ?? false,
+    competitor1RunningAds: comp1MetaRunning,
+    competitor2RunningAds: comp2MetaRunning,
 
     targetRunningGoogleAds: output.googleAds.isRunningAds,
     targetGoogleAdCount: output.googleAds.adCount,
-    competitor1RunningGoogleAds: output.googleAds.competitorAds[0]?.isRunningAds ?? false,
-    competitor2RunningGoogleAds: output.googleAds.competitorAds[1]?.isRunningAds ?? false,
+    competitor1RunningGoogleAds: comp1GoogleRunning,
+    competitor2RunningGoogleAds: comp2GoogleRunning,
+
+    competitor1MetaAdCount: comp1MetaCount,
+    competitor2MetaAdCount: comp2MetaCount,
+    competitor1GoogleAdCount: comp1GoogleCount,
+    competitor2GoogleAdCount: comp2GoogleCount,
+    competitor1AiScore: comp1AiScore,
+    competitor2AiScore: comp2AiScore,
+    competitor1AiVerdict: comp1AiVerdict,
+    competitor2AiVerdict: comp2AiVerdict,
+    manualCompetitor1: manualCompetitor1 ?? null,
+    manualCompetitor2: manualCompetitor2 ?? null,
 
     visibilityScore: audit.visibilityScore,
     verdict: audit.verdict,

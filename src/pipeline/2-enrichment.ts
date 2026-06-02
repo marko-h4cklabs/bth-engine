@@ -361,6 +361,30 @@ async function fetchAdsData(
   }
 }
 
+// ── Single-name ads scraper ───────────────────────────────────────────────────
+
+export async function scrapeAdsForName(name: string): Promise<{
+  metaRunning: boolean; metaCount: number;
+  googleRunning: boolean; googleCount: number;
+}> {
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  try {
+    const context = await browser.newContext({
+      userAgent: META_UA, locale: 'hr-HR', timezoneId: 'Europe/Zagreb',
+      viewport: { width: 1440, height: 900 },
+      extraHTTPHeaders: { 'Accept-Language': 'hr-HR,hr;q=0.9,en-US;q=0.8' },
+    });
+    const page = await context.newPage();
+    await page.route('**/*.{png,jpg,jpeg,gif,webp,mp4,woff,woff2}', (r) => r.abort());
+    const meta = await scrapeMetaAds(page, name);
+    await sleep(randomBetween(1500, 2500));
+    const gads = await scrapeGoogleAds(page, name);
+    return { metaRunning: meta.isRunning, metaCount: meta.count, googleRunning: gads.isRunning, googleCount: gads.count };
+  } finally {
+    await browser.close();
+  }
+}
+
 // ── Public export ─────────────────────────────────────────────────────────────
 
 export async function enrichBusinessData(
