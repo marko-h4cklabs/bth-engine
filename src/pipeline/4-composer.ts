@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import { pathToFileURL } from 'url';
 import { logger } from '../utils/logger.js';
 import { getFontFaceCSS } from '../utils/fonts.js';
-import { getCaseStudyForNiche } from '../db/client.js';
+import { getCaseStudyForNiche, getClient } from '../db/client.js';
 import type { PipelineOutput, DossierData, AiAuditResult, FinancialData } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -362,6 +362,8 @@ export function assembleDossierData(
     financials,
     page2PainStatement: buildPage2PainStatement(financials),
     estimatedMonthlyLoss: Math.round((financials.estimatedMarketingBudget / 12) * 3),
+
+    clientVideoUrl: getClient(slug)?.videoUrl ?? null,
 
     qrCodeBase64,
   };

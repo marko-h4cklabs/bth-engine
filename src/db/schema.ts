@@ -15,6 +15,7 @@ export const CREATE_CLIENTS = `
     pageVisitedAt    TEXT,
     pageVisitCount   INTEGER NOT NULL DEFAULT 0,
     notes            TEXT,
+    videoUrl         TEXT,
     createdAt        TEXT    NOT NULL,
     updatedAt        TEXT    NOT NULL
   )

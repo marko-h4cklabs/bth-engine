@@ -24,6 +24,9 @@ export function getDb(): Database.Database {
     _db.exec(sql);
   }
 
+  // Idempotent migrations for existing databases
+  try { _db.exec('ALTER TABLE clients ADD COLUMN videoUrl TEXT'); } catch { /* column already exists */ }
+
   return _db;
 }
 
@@ -65,6 +68,7 @@ export function upsertClient(data: Omit<ClientRecord, 'id' | 'createdAt' | 'upda
       data.pageVisitedAt ?? null, data.pageVisitCount,
       data.notes ?? null, ts, data.slug,
     );
+    // Preserve videoUrl on upsert — only updateClientVideoUrl changes it
   } else {
     db.prepare(`
       INSERT INTO clients (
@@ -97,6 +101,13 @@ export function updateClientStatus(slug: string, status: ClientStatus): boolean 
   const result = getDb()
     .prepare('UPDATE clients SET status = ?, updatedAt = ? WHERE slug = ?')
     .run(status, now(), slug);
+  return result.changes > 0;
+}
+
+export function updateClientVideoUrl(slug: string, videoUrl: string | null): boolean {
+  const result = getDb()
+    .prepare('UPDATE clients SET videoUrl = ?, updatedAt = ? WHERE slug = ?')
+    .run(videoUrl, now(), slug);
   return result.changes > 0;
 }
 

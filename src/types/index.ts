@@ -146,6 +146,8 @@ export interface DossierData {
   page2PainStatement: string;
   estimatedMonthlyLoss: number;
 
+  clientVideoUrl: string | null;
+
   qrCodeBase64: string;
 }
 
@@ -174,6 +176,7 @@ export interface ClientRecord {
   pageVisitedAt: string | null;
   pageVisitCount: number;
   notes: string | null;
+  videoUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

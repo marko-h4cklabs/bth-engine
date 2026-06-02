@@ -31,7 +31,8 @@ export async function generateLandingPage(data: DossierData): Promise<string> {
   const color       = scoreColor(data.visibilityScore);
 
   const nicheRecord = getNiche(data.niche);
-  const videoUrl = nicheRecord?.videoUrl ?? '';
+  // Client-specific video takes priority over niche default
+  const videoUrl = data.clientVideoUrl || nicheRecord?.videoUrl || '';
 
   const videoSection = videoUrl
     ? `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:800px;margin:0 auto">

@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 loadDotenv({ path: resolve(__dirname, '../../.env') });
 
-import { listNiches, listClients, updateClientStatus } from '../db/client.js';
+import { listNiches, listClients, updateClientStatus, updateClientVideoUrl } from '../db/client.js';
 import type { ClientStatus } from '../types/index.js';
 
 const port = Number(process.env.DASHBOARD_PORT ?? 4000);
@@ -236,6 +236,26 @@ app.post('/api/update-status', (req: Request, res: Response) => {
 
   const ok = updateClientStatus(slug, status as ClientStatus);
   res.json({ ok });
+});
+
+// ── POST /api/update-video-url ────────────────────────────────────────────────
+
+function toYouTubeEmbed(url: string): string {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : url;
+}
+
+app.post('/api/update-video-url', (req: Request, res: Response) => {
+  const { slug, videoUrl } = req.body as { slug?: string; videoUrl?: string };
+
+  if (!slug) {
+    res.status(400).json({ error: 'Missing slug' });
+    return;
+  }
+
+  const embed = videoUrl ? toYouTubeEmbed(videoUrl.trim()) : null;
+  const ok = updateClientVideoUrl(slug, embed || null);
+  res.json({ ok, url: embed });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

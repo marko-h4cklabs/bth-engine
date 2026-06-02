@@ -185,6 +185,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     pageVisitedAt: null,
     pageVisitCount: 0,
     notes: null,
+    videoUrl: null,
   });
 
   // ── Done ──────────────────────────────────────────────────────────────────

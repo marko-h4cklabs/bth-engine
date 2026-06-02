@@ -769,24 +769,39 @@ function renderClients(clients) {
     `;
 
     if (isExpanded) {
+      const safeVideoUrl = (c.videoUrl || '').replace(/"/g, '&quot;');
       html += `
         <tr class="detail-row">
           <td colspan="4">
-            <div class="detail-inner">
-              <div class="detail-field">
-                <label>Status</label>
-                <select id="status-select-${c.slug}" onchange="updateStatus('${c.slug}', this.value)">
-                  ${statusOptions}
-                </select>
+            <div class="detail-inner" style="flex-direction:column;gap:10px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                <div class="detail-field">
+                  <label>Status</label>
+                  <select id="status-select-${c.slug}" onchange="updateStatus('${c.slug}', this.value)">
+                    ${statusOptions}
+                  </select>
+                </div>
+                <div class="detail-actions">
+                  <button class="btn btn-outline btn-sm"
+                    onclick="event.stopPropagation(); doExport('${c.slug}')">
+                    EXPORT
+                  </button>
+                  <button class="btn btn-outline btn-sm"
+                    onclick="event.stopPropagation(); doOpenPdf('${c.slug}')">
+                    PDF
+                  </button>
+                </div>
               </div>
-              <div class="detail-actions">
+              <div style="display:flex;gap:6px;align-items:center;width:100%">
+                <label style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">Video URL</label>
+                <input type="text" id="video-url-${c.slug}"
+                  value="${safeVideoUrl}"
+                  placeholder="https://www.youtube.com/watch?v=... ili embed URL"
+                  style="flex:1;padding:5px 8px;font-size:11px"
+                  onclick="event.stopPropagation()">
                 <button class="btn btn-outline btn-sm"
-                  onclick="event.stopPropagation(); doExport('${c.slug}')">
-                  EXPORT
-                </button>
-                <button class="btn btn-outline btn-sm"
-                  onclick="event.stopPropagation(); doOpenPdf('${c.slug}')">
-                  PDF
+                  onclick="event.stopPropagation(); saveVideoUrl('${c.slug}')">
+                  SPREMI
                 </button>
               </div>
             </div>
@@ -817,6 +832,27 @@ async function updateStatus(slug, status) {
       await loadClients();
     }
   } catch {}
+}
+
+async function saveVideoUrl(slug) {
+  const input = document.getElementById(`video-url-${slug}`);
+  const url = input ? input.value.trim() : '';
+  try {
+    const r = await fetch('/api/update-video-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, videoUrl: url }),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (input && j.url) input.value = j.url; // show normalised embed URL
+      setLogStatus('Video URL spremljen ✓', '#52A882');
+    } else {
+      setLogStatus('Greška pri spremanju video URL-a.', '#E05252');
+    }
+  } catch {
+    setLogStatus('Greška.', '#E05252');
+  }
 }
 
 // ── Niches ────────────────────────────────────────────────────────────────────
