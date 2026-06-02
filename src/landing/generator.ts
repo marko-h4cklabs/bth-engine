@@ -25,7 +25,7 @@ export async function generateLandingPage(data: DossierData): Promise<string> {
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true });
   const outPath = resolve(outDir, 'index.html');
 
-  const calendlyUrl = config.CALENDLY_URL ?? '#';
+  const whatsappUrl = 'https://wa.me/385992532420?text=Pozdrav%2C%20vidio%2Fsam%20dosje%20koji%20ste%20mi%20poslali%20i%20zanima%20me%20više%20informacija.';
   const trackerUrl  = config.TRACKER_URL ?? '';
   const agencyName  = config.AGENCY_NAME ?? '';
   const color       = scoreColor(data.visibilityScore);
@@ -125,9 +125,9 @@ export async function generateLandingPage(data: DossierData): Promise<string> {
 <section style="text-align:center">
   <div class="container">
     <div class="section-eyebrow">— Sljedeći korak —</div>
-    <h2>Zakazajte 15-minutni razgovor</h2>
+    <h2>Kontaktirajte nas direktno</h2>
     <p class="sub">Bez obveza. Samo podaci i konkretan prijedlog.</p>
-    <a href="${calendlyUrl}" class="cta-btn">Zakaži razgovor →</a>
+    <a href="${whatsappUrl}" class="cta-btn" target="_blank" rel="noopener">Piši nam na WhatsApp →</a>
   </div>
 </section>
 

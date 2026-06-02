@@ -15,7 +15,6 @@ const ConfigSchema = z.object({
 
   AGENCY_NAME: z.string().min(1, 'AGENCY_NAME is required'),
   AGENCY_DOMAIN: z.string().url().default('https://agencija.hr'),
-  CALENDLY_URL: z.string().url().default('https://calendly.com/yourlink'),
 
   DEPLOY_MODE: z.enum(['local', 'vercel']).default('local'),
   VERCEL_TOKEN: z.string().optional(),
