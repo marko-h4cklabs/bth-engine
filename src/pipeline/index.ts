@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { clientSlug } from '../utils/slug.js';
+import { clientSlug, toNetlifySlug } from '../utils/slug.js';
 import { getNiche, upsertClient } from '../db/client.js';
 import { getConfigSafe } from '../utils/config.js';
 import { generateQrBase64 } from '../utils/qr.js';
@@ -103,11 +103,11 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
     logger.section('Step 3b — Manual competitor scraping');
     const auditResponses = audit.queries.map(q => q.response);
     const [c1, c2] = await Promise.all([
-      input.competitor1Url ? scrapeManualCompetitor(input.competitor1Url, input.niche, nicheLabel, auditResponses).catch(err => {
+      input.competitor1Url ? scrapeManualCompetitor(input.competitor1Url, input.niche, nicheLabel, auditResponses, business.city).catch(err => {
         logger.warn(`Competitor 1 failed: ${err instanceof Error ? err.message : err}`);
         return null;
       }) : Promise.resolve(null),
-      input.competitor2Url ? scrapeManualCompetitor(input.competitor2Url, input.niche, nicheLabel, auditResponses).catch(err => {
+      input.competitor2Url ? scrapeManualCompetitor(input.competitor2Url, input.niche, nicheLabel, auditResponses, business.city).catch(err => {
         logger.warn(`Competitor 2 failed: ${err instanceof Error ? err.message : err}`);
         return null;
       }) : Promise.resolve(null),
@@ -119,6 +119,10 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   }
 
   const slug = clientSlug(business.legalName, business.city);
+  // Netlify subdomain names must be ≤63 chars. Use a short slug derived from
+  // the brand name (before the first comma) + city — only for the Netlify site
+  // name and the live URL. The full slug is kept for all local paths and the DB.
+  const netlifySlug = toNetlifySlug(business.legalName, business.city);
   const domain = config.AGENCY_DOMAIN ?? 'https://agencija.hr';
   const output: PipelineOutput = { business, google, meta, googleAds, financials, audit, slug, manualCompetitor1, manualCompetitor2 };
 
@@ -127,7 +131,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   // the page can be built before the URL is confirmed live.
   logger.section('Step 4 — Building landing page HTML');
   let landingPagePath = '';
-  let deployedUrl = `https://${slug}.netlify.app`;
+  let deployedUrl = `https://${netlifySlug}.netlify.app`;
   try {
     if (input.dryRun) {
       logger.warn('  DRY RUN — skipping landing page generation');
@@ -146,7 +150,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   logger.section('Step 5 — Deploying landing page');
   try {
     if (!input.dryRun) {
-      deployedUrl = await deployLandingPage(landingPagePath, slug);
+      deployedUrl = await deployLandingPage(landingPagePath, slug, netlifySlug);
       logger.success(`  Live at: ${deployedUrl}`);
     }
   } catch (err) {

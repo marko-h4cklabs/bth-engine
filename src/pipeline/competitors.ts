@@ -40,6 +40,7 @@ export async function scrapeManualCompetitor(
   niche: string,
   nicheLabel: string,
   auditResponses: string[],
+  targetCity?: string,
 ): Promise<ManualCompetitorData> {
   logger.info(`  [Competitor] Scraping: ${companyWallUrl}`);
   const config = getConfigSafe();
@@ -54,6 +55,9 @@ export async function scrapeManualCompetitor(
     directorFullName = biz.directorFullName;
     city = biz.city;
     logger.info(`  [Competitor] Name: ${legalName}`);
+    if (targetCity && city && city.toLowerCase() !== targetCity.toLowerCase()) {
+      logger.warn(`  [Competitor] WARNING: competitor city (${city}) differs from target city (${targetCity}) — verify the URL is correct`);
+    }
   } catch (err) {
     logger.warn(`  [Competitor] CompanyWall scrape failed: ${err instanceof Error ? err.message : err}`);
     legalName = companyWallUrl.split('/').filter(Boolean).pop() ?? 'Unknown';

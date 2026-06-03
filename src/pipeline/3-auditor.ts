@@ -63,9 +63,11 @@ const LEGAL_SUFFIX_RE = /\s+(d\.o\.o\.?|d\.d\.?|j\.d\.o\.o\.?|j\.t\.d\.?|k\.d\.?
 // Extract the unique brand name from a legal or display name.
 // "POLIKLINIKA BAGATIN d.o.o." → "Bagatin"
 // "DENTAL FABRIQUE LAB d.o.o." → "Dental Fabrique Lab"
-// "SRNEC TEKSTIL d.o.o." → "Srnec Tekstil"
+// "FIZIOTIME, obrt za usluge, vl. Petar Kopanja" → "Fiziotime"
 export function extractBrandName(legalName: string): string {
-  const withoutLegal = legalName.replace(LEGAL_SUFFIX_RE, '').trim();
+  // Obrts use "BRAND, obrt za..., vl. Name" — take only what's before the first comma
+  const beforeComma = legalName.includes(',') ? legalName.split(',')[0]!.trim() : legalName;
+  const withoutLegal = beforeComma.replace(LEGAL_SUFFIX_RE, '').trim();
   const words = withoutLegal
     .split(/[\s\-\/,.()+]+/)
     .map((w) => w.replace(/[^a-zA-Z0-9čćšđžČĆŠĐŽ]/g, ''))

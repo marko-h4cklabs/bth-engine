@@ -162,8 +162,18 @@ export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
       directorFullName = directorRaw.trim();
       logger.info(`  director: "${directorFullName}"`);
     } else {
-      directorFullName = 'MANUAL_FILL';
-      logger.warn('Director name not found — set manually via update-status or DB');
+      // Obrts don't have a "direktor" entry — owner is embedded in legal name as "vl. Firstname Lastname"
+      const vlMatch = legalName.match(/vl\.\s+([A-ZŠĐČĆŽ][a-zšđčćž]+\s+[A-ZŠĐČĆŽ][a-zšđčćž]+)/i);
+      if (vlMatch?.[1]) {
+        directorFullName = vlMatch[1].trim();
+        const parts = directorFullName.split(/\s+/);
+        directorFirstName = parts[0] ?? '';
+        directorLastName = parts.slice(1).join(' ');
+        logger.info(`  director (from legal name vl.): "${directorFullName}"`);
+      } else {
+        directorFullName = 'MANUAL_FILL';
+        logger.warn('Director name not found — set manually via update-status or DB');
+      }
     }
 
     return {

@@ -13,6 +13,7 @@ loadDotenv({ path: resolve(__dirname, '../../.env') });
 
 import { listNiches, listClients, updateClientStatus, updateClientVideoUrl, getClient } from '../db/client.js';
 import { generateLandingPage } from '../landing/generator.js';
+import { toNetlifySlug } from '../utils/slug.js';
 import type { ClientStatus, DossierData } from '../types/index.js';
 
 const port = Number(process.env.DASHBOARD_PORT ?? 4000);
@@ -306,8 +307,9 @@ app.post('/api/regen-landing', (req: Request, res: Response) => {
         return;
       }
 
-      sseWrite(res, { type: 'log', text: `[regen] Creating/finding Netlify site "${slug}"...\n` });
-      const siteId = await netlifyCreateOrFindSite(slug, token);
+      const nSlug = toNetlifySlug(dossierData.legalName, dossierData.city);
+      sseWrite(res, { type: 'log', text: `[regen] Creating/finding Netlify site "${nSlug}"...\n` });
+      const siteId = await netlifyCreateOrFindSite(nSlug, token);
       sseWrite(res, { type: 'log', text: `[regen] Site ID: ${siteId}\n` });
 
       const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
@@ -324,7 +326,7 @@ app.post('/api/regen-landing', (req: Request, res: Response) => {
         proc.on('close', (code) => code === 0 ? ok() : fail(new Error(`Netlify CLI exited ${code}`)));
       });
 
-      const liveUrl = `https://${slug}.netlify.app`;
+      const liveUrl = `https://${nSlug}.netlify.app`;
       sseWrite(res, { type: 'log', text: `[regen] Live at: ${liveUrl}\n` });
       sseWrite(res, { type: 'url', url: liveUrl });
       sseWrite(res, { type: 'done', success: true });

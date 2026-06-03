@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { logger } from '../utils/logger.js';
 
 interface NetlifySite { id: string; name: string; subdomain: string }
@@ -31,8 +31,12 @@ async function createOrFindSite(slug: string, token: string): Promise<string> {
   throw new Error(`Create site failed (${createRes.status}): ${errText}`);
 }
 
-export async function deployLandingPage(_sourcePath: string, slug: string): Promise<string> {
-  const clientUrl = `https://${slug}.netlify.app`;
+// netlifySlug is the short ≤63-char slug used as the Netlify site name/subdomain.
+// slug is the full filesystem slug (used for output/pages/{slug}/).
+// If netlifySlug is omitted it falls back to slug (existing behaviour for short names).
+export async function deployLandingPage(sourcePath: string, slug: string, netlifySlug?: string): Promise<string> {
+  const effectiveSlug = netlifySlug ?? slug;
+  const clientUrl = `https://${effectiveSlug}.netlify.app`;
   const token = process.env.NETLIFY_TOKEN;
 
   if (!token) {
@@ -42,13 +46,15 @@ export async function deployLandingPage(_sourcePath: string, slug: string): Prom
   }
 
   // Step 1: create or reuse the Netlify site via REST API → get UUID site ID
-  logger.info(`  [Deploy] Creating/finding site "${slug}"...`);
-  const siteId = await createOrFindSite(slug, token);
+  logger.info(`  [Deploy] Creating/finding site "${effectiveSlug}"...`);
+  const siteId = await createOrFindSite(effectiveSlug, token);
   logger.info(`  [Deploy] Site ID: ${siteId}`);
 
-  // Step 2: deploy using Netlify CLI with the UUID site ID and --auth flag
-  // This bypasses all CLI login state and name-resolution issues.
-  const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
+  // Step 2: deploy using Netlify CLI with the UUID site ID and --auth flag.
+  // Derive page dir from sourcePath (avoids re-computing the full slug here).
+  const pageDir = sourcePath
+    ? dirname(resolve(sourcePath))
+    : resolve(process.cwd(), 'output', 'pages', slug);
   logger.info(`  [Deploy] Deploying ${pageDir}...`);
 
   await new Promise<void>((res, rej) => {

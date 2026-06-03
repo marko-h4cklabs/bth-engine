@@ -20,3 +20,13 @@ export function toSlug(input: string): string {
 export function clientSlug(businessName: string, city: string): string {
   return `${toSlug(businessName)}-${toSlug(city)}`;
 }
+
+// Short slug safe for Netlify subdomain names (≤63 chars).
+// Takes only what's before the first comma (handles obrts like "FIZIOTIME, obrt za...")
+// so "FIZIOTIME, obrt za usluge, vl. Petar Kopanja, Zagreb" → "fiziotime-zagreb".
+export function toNetlifySlug(legalName: string, city: string): string {
+  const brand = legalName.split(',')[0]!.trim();
+  const brandSlug = toSlug(brand).slice(0, 35).replace(/-+$/, '');
+  const citySlug  = toSlug(city).slice(0, 10).replace(/-+$/, '');
+  return `${brandSlug}-${citySlug}`.replace(/-+/g, '-').replace(/-+$/, '').slice(0, 63);
+}
