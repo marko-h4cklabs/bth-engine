@@ -152,12 +152,20 @@ function buildComparisonTable(data: DossierData, c1: CompetitorView, c2: Competi
     if (c1.googleRunning || c2.googleRunning) return `<td ${lose('', val)}</td>`;
     return `<td ${neutral(val)}</td>`;
   }
+  const allZeroAi = data.visibilityScore === 0 && c1.aiScore === 0 && c2.aiScore === 0;
+
   function aiCell(): string {
     const s = data.visibilityScore;
+    if (allZeroAi) {
+      return `<td style="padding:11px 14px;border-bottom:1px solid rgba(201,162,39,0.1)"><span style="color:${GOLD};font-weight:700">0/100</span></td>`;
+    }
     const col = scoreColor(s);
     return `<td style="padding:11px 14px;border-bottom:1px solid rgba(201,162,39,0.1)"><span style="color:${col};font-weight:700">${s}/100</span> <span style="font-size:11px;color:${col}">${esc(data.verdict)}</span></td>`;
   }
   function compAiCell(cv: CompetitorView): string {
+    if (allZeroAi) {
+      return `<td style="padding:11px 14px;border-bottom:1px solid rgba(201,162,39,0.06)"><span style="color:${GOLD};font-size:12px">0/100</span></td>`;
+    }
     const col = scoreColor(cv.aiScore);
     return `<td style="padding:11px 14px;border-bottom:1px solid rgba(201,162,39,0.06)"><span style="color:${col};font-size:12px">${cv.aiScore}/100</span></td>`;
   }
@@ -227,7 +235,17 @@ function buildComparisonTable(data: DossierData, c1: CompetitorView, c2: Competi
       <td ${compCell('—')}</td>
     </tr>` : ''}
   </tbody>
-</table>`.trim();
+</table>
+${allZeroAi ? `
+<div style="margin-top:20px;background:#141210;border:1px solid ${GOLD};border-left:4px solid ${GOLD};padding:18px 22px">
+  <div style="font-family:Georgia,serif;font-size:11px;color:${GOLD};letter-spacing:0.3em;text-transform:uppercase;margin-bottom:10px">◆ Tržišna Prilika</div>
+  <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;font-style:italic;color:rgba(240,237,230,0.95);line-height:1.6;margin-bottom:8px">
+    Nitko u ovoj niši u ${esc(toCroatianLocative(data.city))} trenutno nije vidljiv AI asistentima.
+  </p>
+  <p style="font-family:Georgia,'Times New Roman',serif;font-size:15px;font-style:italic;color:${GOLD};line-height:1.6">
+    Tko prvi zauzme tu poziciju — dominira tržištem.
+  </p>
+</div>` : ''}`.trim();
 }
 
 function buildAdsSection(data: DossierData, c1: CompetitorView, c2: CompetitorView): string {
