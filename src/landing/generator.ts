@@ -88,6 +88,24 @@ interface CompetitorView {
 }
 
 function toCompView(data: DossierData, slot: 1 | 2): CompetitorView {
+  // Prefer ManualCompetitorData directly — it has the freshest scraped values.
+  // Fall back to flat DossierData fields (auto-discovered Google Places data).
+  const manual = slot === 1 ? data.manualCompetitor1 : data.manualCompetitor2;
+
+  if (manual) {
+    return {
+      name:          manual.legalName,
+      rating:        manual.googleRating,
+      reviewCount:   manual.googleReviewCount,
+      metaRunning:   manual.metaAdsRunning,
+      metaCount:     manual.metaAdCount,
+      googleRunning: manual.googleAdsRunning,
+      googleCount:   manual.googleAdCount,
+      aiScore:       manual.aiVisibilityScore,
+      aiVerdict:     manual.aiVerdict,
+    };
+  }
+
   if (slot === 1) {
     return {
       name:          data.competitor1Name,
