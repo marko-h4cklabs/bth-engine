@@ -21,10 +21,41 @@ async function resolveUrl(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BTHBot/1.0)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
     });
+
+    // HTTP redirect worked and moved us to a different host
+    if (res.url !== url && !res.url.includes('maps.app.goo.gl')) {
+      return res.url;
+    }
+
+    // maps.app.goo.gl uses Firebase Dynamic Links (JS-based redirect) — parse HTML
+    if (url.includes('maps.app.goo.gl')) {
+      const html = await res.text();
+      if (html.includes('Dynamic Link Not Found')) {
+        throw new Error(
+          `Google Maps short URL has expired or is invalid: ${url}\n` +
+          `Please open the business in Google Maps and tap Share → Copy link for a fresh URL.`,
+        );
+      }
+      // og:url meta tag
+      const ogMatch = html.match(/property="og:url"\s+content="([^"]*google\.com\/maps[^"]*)"/i)
+        ?? html.match(/content="([^"]*google\.com\/maps[^"]*)"\s+property="og:url"/i);
+      if (ogMatch?.[1]) return ogMatch[1];
+      // fallback_link in Firebase JS params
+      const fallbackMatch = html.match(/"fallback_link":"([^"]+google[^"]+)"/);
+      if (fallbackMatch?.[1]) return decodeURIComponent(fallbackMatch[1].replace(/\\u0026/g, '&').replace(/\\\//g, '/'));
+      // any google.com/maps URL in the body
+      const mapsMatch = html.match(/https:\/\/(?:www\.)?google\.com\/maps\/[^\s"'<>]+/);
+      if (mapsMatch?.[0]) return mapsMatch[0];
+    }
+
     return res.url;
-  } catch {
+  } catch (err) {
+    // Re-throw our own descriptive errors (expired link etc.)
+    if (err instanceof Error && err.message.includes('expired')) throw err;
     return url;
   }
 }
