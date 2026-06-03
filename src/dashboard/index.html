@@ -817,6 +817,11 @@ function renderClients(clients) {
                   onclick="event.stopPropagation(); saveVideoUrl('${c.slug}')">
                   SPREMI
                 </button>
+                <button class="btn btn-outline btn-sm"
+                  style="white-space:nowrap"
+                  onclick="event.stopPropagation(); doRedeployLanding('${c.slug}')">
+                  ↻ REDEPLOY
+                </button>
               </div>
             </div>
           </td>
@@ -865,6 +870,31 @@ async function saveVideoUrl(slug) {
       setLogStatus('Greška pri spremanju video URL-a.', '#E05252');
     }
   } catch {
+    setLogStatus('Greška.', '#E05252');
+  }
+}
+
+async function doRedeployLanding(slug) {
+  clearLog();
+  liveUrl.style.display = 'none';
+  setLogStatus('Regeneriranje i deploy…', '#C9A227');
+
+  try {
+    await streamPost('/api/regen-landing', { slug }, (data) => {
+      if (data.type === 'log') appendLog(data.text);
+      if (data.type === 'url') {
+        urlLink.href = data.url;
+        urlLink.textContent = data.url;
+        liveUrl.style.display = 'block';
+      }
+      if (data.type === 'done') {
+        setLogStatus(
+          data.success ? 'Redeploy gotov! ✓' : 'Redeploy nije uspio.',
+          data.success ? '#52A882' : '#E05252',
+        );
+      }
+    });
+  } catch (err) {
     setLogStatus('Greška.', '#E05252');
   }
 }

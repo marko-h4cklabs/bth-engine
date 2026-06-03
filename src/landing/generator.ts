@@ -542,5 +542,13 @@ ${trackerScript}
 
   writeFileSync(outPath, html, 'utf-8');
   logger.success(`  Landing page written: ${outPath}`);
+
+  // Write sidecar dossier JSON — stored outside the pages dir so it's never
+  // deployed to Netlify, but allows the dashboard to regenerate HTML later
+  // (e.g. after setting a video URL) without re-running the full pipeline.
+  const dossierDir = resolve(process.cwd(), 'output', 'dossiers');
+  if (!existsSync(dossierDir)) mkdirSync(dossierDir, { recursive: true });
+  writeFileSync(resolve(dossierDir, `${data.slug}.json`), JSON.stringify(data), 'utf-8');
+
   return outPath;
 }

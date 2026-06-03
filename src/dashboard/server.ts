@@ -4,15 +4,16 @@ import { config as loadDotenv } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import type { Request, Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 loadDotenv({ path: resolve(__dirname, '../../.env') });
 
-import { listNiches, listClients, updateClientStatus, updateClientVideoUrl } from '../db/client.js';
-import type { ClientStatus } from '../types/index.js';
+import { listNiches, listClients, updateClientStatus, updateClientVideoUrl, getClient } from '../db/client.js';
+import { generateLandingPage } from '../landing/generator.js';
+import type { ClientStatus, DossierData } from '../types/index.js';
 
 const port = Number(process.env.DASHBOARD_PORT ?? 4000);
 const TSX = resolve(process.cwd(), 'node_modules/.bin/tsx');
@@ -264,6 +265,76 @@ app.post('/api/update-video-url', (req: Request, res: Response) => {
   const embed = videoUrl ? toYouTubeEmbed(videoUrl.trim()) : null;
   const ok = updateClientVideoUrl(slug, embed || null);
   res.json({ ok, url: embed });
+});
+
+// ── POST /api/regen-landing ───────────────────────────────────────────────────
+// Regenerates the landing page HTML from the stored dossier sidecar JSON
+// (written by generateLandingPage at generation time), applies the current
+// videoUrl from the DB, then redeploys via Netlify CLI.
+
+app.post('/api/regen-landing', (req: Request, res: Response) => {
+  const { slug } = req.body as { slug?: string };
+
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    res.status(400).json({ error: 'Missing or invalid slug' });
+    return;
+  }
+
+  startSSE(res);
+
+  (async () => {
+    try {
+      const dossierPath = resolve(process.cwd(), 'output', 'dossiers', `${slug}.json`);
+      if (!existsSync(dossierPath)) {
+        throw new Error('Dossier JSON not found — run a full generate first to create the sidecar file');
+      }
+
+      // Load stored DossierData and patch the videoUrl from DB
+      const dossierData = JSON.parse(readFileSync(dossierPath, 'utf-8')) as DossierData;
+      const client = getClient(slug);
+      dossierData.clientVideoUrl = client?.videoUrl ?? null;
+
+      sseWrite(res, { type: 'log', text: `[regen] Regenerating landing page (videoUrl: ${dossierData.clientVideoUrl ?? 'none'})...\n` });
+      await generateLandingPage(dossierData);
+      sseWrite(res, { type: 'log', text: '[regen] Landing page HTML updated\n' });
+
+      const token = process.env.NETLIFY_TOKEN;
+      if (!token) {
+        sseWrite(res, { type: 'log', text: '[regen] NETLIFY_TOKEN not set — HTML updated locally but not deployed\n' });
+        sseWrite(res, { type: 'done', success: true });
+        res.end();
+        return;
+      }
+
+      sseWrite(res, { type: 'log', text: `[regen] Creating/finding Netlify site "${slug}"...\n` });
+      const siteId = await netlifyCreateOrFindSite(slug, token);
+      sseWrite(res, { type: 'log', text: `[regen] Site ID: ${siteId}\n` });
+
+      const pageDir = resolve(process.cwd(), 'output', 'pages', slug);
+      sseWrite(res, { type: 'log', text: `[regen] Deploying ${pageDir}...\n` });
+
+      await new Promise<void>((ok, fail) => {
+        const proc = spawn(
+          'npx',
+          ['netlify', 'deploy', '--prod', '--dir', pageDir, '--site', siteId, '--auth', token, '--json'],
+          { cwd: process.cwd(), env: process.env },
+        );
+        proc.stdout?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+        proc.stderr?.on('data', (d: Buffer) => sseWrite(res, { type: 'log', text: d.toString() }));
+        proc.on('close', (code) => code === 0 ? ok() : fail(new Error(`Netlify CLI exited ${code}`)));
+      });
+
+      const liveUrl = `https://${slug}.netlify.app`;
+      sseWrite(res, { type: 'log', text: `[regen] Live at: ${liveUrl}\n` });
+      sseWrite(res, { type: 'url', url: liveUrl });
+      sseWrite(res, { type: 'done', success: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sseWrite(res, { type: 'log', text: `[regen] ERROR: ${msg}\n` });
+      sseWrite(res, { type: 'done', success: false });
+    }
+    res.end();
+  })();
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
