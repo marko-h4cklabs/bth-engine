@@ -100,12 +100,13 @@ export interface AiAuditResult {
 }
 
 export interface PipelineInput {
-  companyWallUrl: string;
+  googleMapsUrl: string;
+  directorName: string;
   niche: string;
   dryRun?: boolean;
   deploy?: boolean;
-  competitor1Url?: string | null;
-  competitor2Url?: string | null;
+  competitor1Url?: string | null;  // CompanyWall or Google Maps URL
+  competitor2Url?: string | null;  // CompanyWall or Google Maps URL
 }
 
 export interface PipelineOutput {

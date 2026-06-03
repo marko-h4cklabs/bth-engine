@@ -1,10 +1,29 @@
-import { scrapeCompanyWall } from './1-scraper.js';
+import { scrapeCompanyWall } from './companywall-scraper.js';
 import { scrapeFinancials } from './1b-financials.js';
+import { resolveAndFetchPlace } from './1-scraper.js';
 import { scrapeAdsForName } from './2-enrichment.js';
 import { extractBrandName } from './3-auditor.js';
 import { getConfigSafe } from '../utils/config.js';
 import { logger } from '../utils/logger.js';
 import type { ManualCompetitorData, FinancialData } from '../types/index.js';
+
+function isGoogleMapsUrl(url: string): boolean {
+  return (
+    url.includes('maps.google.com') ||
+    url.includes('maps.app.goo.gl') ||
+    url.includes('google.com/maps')
+  );
+}
+
+function extractCityFromAddress(address: string): string {
+  const parts = address.split(',').map((p) => p.trim());
+  for (let i = 0; i < parts.length; i++) {
+    if (/^\d{5}$/.test(parts[i] ?? '')) return parts[i + 1] ?? 'Zagreb';
+  }
+  const last = parts[parts.length - 1]?.toLowerCase() ?? '';
+  if (last === 'croatia' || last === 'hrvatska') return parts[parts.length - 2] ?? 'Zagreb';
+  return parts[parts.length - 1] ?? 'Zagreb';
+}
 
 async function lookupGoogleRating(legalName: string, city: string, apiKey: string): Promise<{ rating: number; reviewCount: number }> {
   try {
@@ -36,44 +55,71 @@ function computeAiScore(legalName: string, auditResponses: string[]): { score: n
 }
 
 export async function scrapeManualCompetitor(
-  companyWallUrl: string,
+  sourceUrl: string,
   niche: string,
   nicheLabel: string,
   auditResponses: string[],
   targetCity?: string,
 ): Promise<ManualCompetitorData> {
-  logger.info(`  [Competitor] Scraping: ${companyWallUrl}`);
+  logger.info(`  [Competitor] Scraping: ${sourceUrl}`);
   const config = getConfigSafe();
 
-  // Step 1: CompanyWall scrape
   let legalName = '';
   let directorFullName = '';
   let city = '';
-  try {
-    const biz = await scrapeCompanyWall(companyWallUrl);
-    legalName = biz.legalName;
-    directorFullName = biz.directorFullName;
-    city = biz.city;
-    logger.info(`  [Competitor] Name: ${legalName}`);
-    if (targetCity && city && city.toLowerCase() !== targetCity.toLowerCase()) {
-      logger.warn(`  [Competitor] WARNING: competitor city (${city}) differs from target city (${targetCity}) — verify the URL is correct`);
-    }
-  } catch (err) {
-    logger.warn(`  [Competitor] CompanyWall scrape failed: ${err instanceof Error ? err.message : err}`);
-    legalName = companyWallUrl.split('/').filter(Boolean).pop() ?? 'Unknown';
-  }
-
-  // Step 2: Google Places rating
   let googleRating = 0;
   let googleReviewCount = 0;
-  if (config.GOOGLE_PLACES_API_KEY) {
-    const g = await lookupGoogleRating(legalName, city, config.GOOGLE_PLACES_API_KEY);
-    googleRating = g.rating;
-    googleReviewCount = g.reviewCount;
-    logger.info(`  [Competitor] Google: ${googleRating}★ (${googleReviewCount} reviews)`);
+
+  if (isGoogleMapsUrl(sourceUrl)) {
+    // ── Google Maps path ──────────────────────────────────────────────────
+    logger.info('  [Competitor] Source: Google Maps');
+    if (!config.GOOGLE_PLACES_API_KEY) {
+      logger.warn('  [Competitor] GOOGLE_PLACES_API_KEY not set — cannot fetch place details');
+    } else {
+      try {
+        const place = await resolveAndFetchPlace(sourceUrl, config.GOOGLE_PLACES_API_KEY);
+        if (place) {
+          legalName = place.displayName?.text ?? '';
+          city = extractCityFromAddress(place.formattedAddress ?? '');
+          googleRating = place.rating ?? 0;
+          googleReviewCount = place.userRatingCount ?? 0;
+          logger.info(`  [Competitor] Name: ${legalName} | ${googleRating}★ (${googleReviewCount})`);
+          if (targetCity && city && city.toLowerCase() !== targetCity.toLowerCase()) {
+            logger.warn(`  [Competitor] City mismatch: ${city} vs target ${targetCity}`);
+          }
+        }
+      } catch (err) {
+        logger.warn(`  [Competitor] Google Maps fetch failed: ${err instanceof Error ? err.message : err}`);
+        legalName = sourceUrl.split('/').filter(Boolean).pop() ?? 'Unknown';
+      }
+    }
+    directorFullName = 'MANUAL_FILL';
+  } else {
+    // ── CompanyWall path ──────────────────────────────────────────────────
+    logger.info('  [Competitor] Source: CompanyWall');
+    try {
+      const biz = await scrapeCompanyWall(sourceUrl);
+      legalName = biz.legalName;
+      directorFullName = biz.directorFullName;
+      city = biz.city;
+      logger.info(`  [Competitor] Name: ${legalName}`);
+      if (targetCity && city && city.toLowerCase() !== targetCity.toLowerCase()) {
+        logger.warn(`  [Competitor] City mismatch: ${city} vs target ${targetCity}`);
+      }
+    } catch (err) {
+      logger.warn(`  [Competitor] CompanyWall scrape failed: ${err instanceof Error ? err.message : err}`);
+      legalName = sourceUrl.split('/').filter(Boolean).pop() ?? 'Unknown';
+    }
+
+    if (config.GOOGLE_PLACES_API_KEY && legalName) {
+      const g = await lookupGoogleRating(legalName, city, config.GOOGLE_PLACES_API_KEY);
+      googleRating = g.rating;
+      googleReviewCount = g.reviewCount;
+      logger.info(`  [Competitor] Google: ${googleRating}★ (${googleReviewCount} reviews)`);
+    }
   }
 
-  // Step 3: Ads scraping (Meta + Google Ads)
+  // ── Ads scraping ──────────────────────────────────────────────────────────
   const searchName = legalName.replace(/\s+(d\.o\.o\.?|d\.d\.?|j\.d\.o\.o\.?).*$/i, '').trim();
   const ads = await scrapeAdsForName(searchName).catch(err => {
     logger.warn(`  [Competitor] Ads scrape failed: ${err instanceof Error ? err.message : err}`);
@@ -81,26 +127,28 @@ export async function scrapeManualCompetitor(
   });
   logger.info(`  [Competitor] Meta: ${ads.metaRunning} (${ads.metaCount}) | Gads: ${ads.googleRunning} (${ads.googleCount})`);
 
-  // Step 4: AI score from existing responses
+  // ── AI score ──────────────────────────────────────────────────────────────
   const ai = computeAiScore(legalName, auditResponses);
   logger.info(`  [Competitor] AI: ${ai.score}/100 ${ai.verdict}`);
 
-  // Step 5: Financial scrape (non-fatal)
+  // ── Financial scrape (CompanyWall only) ───────────────────────────────────
   let financials: FinancialData | null = null;
-  try {
-    const fin = await scrapeFinancials(companyWallUrl);
-    if (fin.years.length > 0 && fin.years[0]!.revenue > 0) {
-      financials = fin;
-      logger.info(`  [Competitor] Financials: €${fin.years[0]!.revenue.toLocaleString('hr-HR')} revenue`);
+  if (!isGoogleMapsUrl(sourceUrl)) {
+    try {
+      const fin = await scrapeFinancials(sourceUrl);
+      if (fin.years.length > 0 && fin.years[0]!.revenue > 0) {
+        financials = fin;
+        logger.info(`  [Competitor] Financials: €${fin.years[0]!.revenue.toLocaleString('hr-HR')} revenue`);
+      }
+    } catch {
+      // non-fatal
     }
-  } catch {
-    // non-fatal
   }
 
   void niche; void nicheLabel;
 
   return {
-    companyWallUrl,
+    companyWallUrl: sourceUrl,
     legalName,
     directorFullName,
     googleRating,

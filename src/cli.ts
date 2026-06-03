@@ -45,29 +45,33 @@ program
 // ── bth generate ─────────────────────────────────────────────────────────────
 
 program
-  .command('generate <companyWallUrl>')
-  .description('Run the full pipeline for a CompanyWall URL and generate PDF + landing page')
+  .command('generate <googleMapsUrl>')
+  .description('Run the full pipeline for a Google Maps URL and generate PDF + landing page')
   .requiredOption('--niche <slug>', 'Business niche slug (e.g. estetska-medicina)')
+  .requiredOption('--director <name>', 'Director / owner full name (manually provided)')
   .option('--deploy', 'Deploy landing page after generation')
   .option('--dry-run', 'Run all steps, print output, skip PDF and deploy')
-  .option('--competitor1 <url>', 'CompanyWall URL for manual competitor 1')
-  .option('--competitor2 <url>', 'CompanyWall URL for manual competitor 2')
-  .action(async (companyWallUrl: string, opts: {
+  .option('--competitor1 <url>', 'Google Maps or CompanyWall URL for manual competitor 1')
+  .option('--competitor2 <url>', 'Google Maps or CompanyWall URL for manual competitor 2')
+  .action(async (googleMapsUrl: string, opts: {
     niche: string;
+    director: string;
     deploy?: boolean;
     dryRun?: boolean;
     competitor1?: string;
     competitor2?: string;
   }) => {
     logger.section('BTH Generate');
-    logger.info(`URL:   ${chalk.bold(companyWallUrl)}`);
-    logger.info(`Niche: ${opts.niche}`);
+    logger.info(`URL:      ${chalk.bold(googleMapsUrl)}`);
+    logger.info(`Director: ${opts.director}`);
+    logger.info(`Niche:    ${opts.niche}`);
     if (opts.dryRun) logger.warn('DRY RUN — PDF and deploy will be skipped');
 
     try {
       const { runPipeline } = await import('./pipeline/index.js');
       await runPipeline({
-        companyWallUrl,
+        googleMapsUrl,
+        directorName: opts.director,
         niche: opts.niche,
         ...(opts.deploy !== undefined && { deploy: opts.deploy }),
         ...(opts.dryRun !== undefined && { dryRun: opts.dryRun }),

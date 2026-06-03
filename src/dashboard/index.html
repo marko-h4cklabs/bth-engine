@@ -381,9 +381,15 @@
     <div class="panel-body">
 
       <div class="field">
-        <label>CompanyWall URL</label>
+        <label>Google Maps URL</label>
         <input type="text" id="url-input"
-          placeholder="https://www.companywall.hr/tvrtka/naziv/AbCd">
+          placeholder="https://maps.app.goo.gl/... ili https://www.google.com/maps/place/...">
+      </div>
+
+      <div class="field">
+        <label>Ime direktora / vlasnika</label>
+        <input type="text" id="director-input"
+          placeholder="Petar Kopanja">
       </div>
 
       <div class="field">
@@ -396,13 +402,13 @@
       <div class="field">
         <label>Konkurent 1 (neobavezno)</label>
         <input type="text" id="competitor1-input"
-          placeholder="https://www.companywall.hr/tvrtka/konkurent-1/AbCd">
+          placeholder="Google Maps ili CompanyWall URL">
       </div>
 
       <div class="field">
         <label>Konkurent 2 (neobavezno)</label>
         <input type="text" id="competitor2-input"
-          placeholder="https://www.companywall.hr/tvrtka/konkurent-2/AbCd">
+          placeholder="Google Maps ili CompanyWall URL">
       </div>
 
       <div id="error-msg" class="error-msg" style="display:none"></div>
@@ -459,6 +465,7 @@ let isRunning = false;
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
 const urlInput        = document.getElementById('url-input');
+const directorInput   = document.getElementById('director-input');
 const nicheSelect     = document.getElementById('niche-select');
 const errorMsg        = document.getElementById('error-msg');
 const btnGenerate     = document.getElementById('btn-generate');
@@ -596,12 +603,17 @@ async function doGenerate() {
   hideError();
 
   const url = urlInput.value.trim();
+  const director = directorInput.value.trim();
   const niche = nicheSelect.value;
   const competitor1 = document.getElementById('competitor1-input').value.trim() || null;
   const competitor2 = document.getElementById('competitor2-input').value.trim() || null;
 
-  if (!url) { showError('Unesite CompanyWall URL.'); return; }
-  if (!url.includes('companywall.hr')) { showError('URL mora biti s companywall.hr'); return; }
+  if (!url) { showError('Unesite Google Maps URL.'); return; }
+  if (!url.includes('google.com/maps') && !url.includes('maps.app.goo.gl') && !url.includes('maps.google.com')) {
+    showError('URL mora biti Google Maps link (maps.google.com, google.com/maps ili maps.app.goo.gl)');
+    return;
+  }
+  if (!director) { showError('Unesite ime direktora / vlasnika.'); return; }
   if (!niche) { showError('Odaberite nišu.'); return; }
 
   isRunning = true;
@@ -619,7 +631,7 @@ async function doGenerate() {
   let foundUrl = null;
 
   try {
-    await streamPost('/api/generate', { companyWallUrl: url, niche, competitor1Url: competitor1, competitor2Url: competitor2 }, (data) => {
+    await streamPost('/api/generate', { googleMapsUrl: url, directorName: director, niche, competitor1Url: competitor1, competitor2Url: competitor2 }, (data) => {
       if (data.type === 'log') {
         appendLog(data.text);
         // Extract from the raw message text — newlines terminate matches cleanly

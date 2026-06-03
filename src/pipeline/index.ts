@@ -3,8 +3,7 @@ import { clientSlug, toNetlifySlug } from '../utils/slug.js';
 import { getNiche, upsertClient } from '../db/client.js';
 import { getConfigSafe } from '../utils/config.js';
 import { generateQrBase64 } from '../utils/qr.js';
-import { scrapeCompanyWall } from './1-scraper.js';
-import { scrapeFinancials } from './1b-financials.js';
+import { scrapeFromGoogleMaps } from './1-scraper.js';
 import { enrichBusinessData } from './2-enrichment.js';
 import { runAiAudit } from './3-auditor.js';
 import { scrapeManualCompetitor } from './competitors.js';
@@ -16,52 +15,40 @@ import type { PipelineInput, PipelineOutput } from '../types/index.js';
 export async function runPipeline(input: PipelineInput): Promise<PipelineOutput> {
   const config = getConfigSafe();
 
-  // ── Step 1 — Scrape CompanyWall ───────────────────────────────────────────
-  logger.section('Step 1 — Scraping CompanyWall');
+  // ── Step 1 — Fetch from Google Maps / Places API ─────────────────────────
+  logger.section('Step 1 — Google Maps → Places API');
+
+  if (!config.GOOGLE_PLACES_API_KEY) {
+    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.warn('GOOGLE_PLACES_API_KEY not set — Step 1 will fail.');
+    logger.warn('Get a key: console.cloud.google.com → Places API');
+    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  }
+
   let business;
   try {
-    business = await scrapeCompanyWall(input.companyWallUrl);
+    business = await scrapeFromGoogleMaps({
+      googleMapsUrl: input.googleMapsUrl,
+      directorName: input.directorName,
+    });
   } catch (err) {
     logger.error(`Step 1 failed: ${err instanceof Error ? err.message : err}`);
     throw err;
   }
   logger.data('Legal name', business.legalName);
-  logger.data('OIB',        business.oib || '(not found)');
   logger.data('Address',    business.address || '(not found)');
   logger.data('Director',   business.directorFullName);
   logger.data('Activity',   business.registeredActivity || '(not found)');
 
-  if (!config.GOOGLE_PLACES_API_KEY) {
-    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    logger.warn('GOOGLE_PLACES_API_KEY not set.');
-    logger.warn('Page 1 competitor table will have empty data.');
-    logger.warn('Get a key: console.cloud.google.com → Places API');
-    logger.warn('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  }
-
-  // ── Step 1b — Financial scrape ────────────────────────────────────────────
+  // ── Step 1b — Financial data (requires CompanyWall; skipped for Google Maps input) ──
   logger.section('Step 1b — Financial data');
-  let financials;
-  try {
-    financials = await scrapeFinancials(input.companyWallUrl);
-    if (financials.years.length > 0) {
-      const latest = financials.years[0]!;
-      logger.data('Latest year',   String(latest.year));
-      logger.data('Revenue',       `€${latest.revenue.toLocaleString('hr-HR')}`);
-      logger.data('Profit trend',  financials.profitTrend);
-      logger.data('Employees',     String(financials.employeeCount));
-      logger.data('Est. budget',   `€${financials.estimatedMarketingBudget.toLocaleString('hr-HR')}`);
-    } else {
-      logger.warn('  No financial data available for this company');
-    }
-  } catch (err) {
-    logger.warn(`Step 1b failed (non-fatal): ${err instanceof Error ? err.message : err}`);
-    financials = {
-      years: [], revenueGrowth: 0, profitTrend: 'stable' as const,
-      employeeCount: 0, estimatedMarketingBudget: 0, currentDigitalSpend: 0,
-      dataSource: 'companywall' as const,
-    };
-  }
+  logger.info('  Financial data requires CompanyWall URL — not available for Google Maps input.');
+  logger.info('  Skipping. Enter financials manually if needed.');
+  const financials = {
+    years: [], revenueGrowth: 0, profitTrend: 'stable' as const,
+    employeeCount: 0, estimatedMarketingBudget: 0, currentDigitalSpend: 0,
+    dataSource: 'companywall' as const,
+  };
 
   // ── Step 2 — Enrich data ──────────────────────────────────────────────────
   logger.section('Step 2 — Enriching data');

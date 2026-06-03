@@ -76,20 +76,21 @@ function spawnSSE(
 // ── POST /api/generate ────────────────────────────────────────────────────────
 
 app.post('/api/generate', (req: Request, res: Response) => {
-  const { companyWallUrl, niche, competitor1Url, competitor2Url } = req.body as {
-    companyWallUrl?: string;
+  const { googleMapsUrl, directorName, niche, competitor1Url, competitor2Url } = req.body as {
+    googleMapsUrl?: string;
+    directorName?: string;
     niche?: string;
     competitor1Url?: string | null;
     competitor2Url?: string | null;
   };
 
-  if (!companyWallUrl || !niche) {
-    res.status(400).json({ error: 'Missing companyWallUrl or niche' });
+  if (!googleMapsUrl || !directorName || !niche) {
+    res.status(400).json({ error: 'Missing googleMapsUrl, directorName, or niche' });
     return;
   }
 
   startSSE(res);
-  const args = ['src/cli.ts', 'generate', companyWallUrl, '--niche', niche];
+  const args = ['src/cli.ts', 'generate', googleMapsUrl, '--niche', niche, '--director', directorName];
   if (competitor1Url) args.push('--competitor1', competitor1Url);
   if (competitor2Url) args.push('--competitor2', competitor2Url);
   spawnSSE(res, TSX, args, (code) => {
