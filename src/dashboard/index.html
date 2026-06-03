@@ -810,17 +810,18 @@ function renderClients(clients) {
                 <label style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">Video URL</label>
                 <input type="text" id="video-url-${c.slug}"
                   value="${safeVideoUrl}"
-                  placeholder="https://www.youtube.com/watch?v=... ili embed URL"
+                  placeholder="https://www.youtube.com/watch?v=..."
                   style="flex:1;padding:5px 8px;font-size:11px"
                   onclick="event.stopPropagation()">
                 <button class="btn btn-outline btn-sm"
-                  onclick="event.stopPropagation(); saveVideoUrl('${c.slug}')">
-                  SPREMI
+                  style="white-space:nowrap"
+                  onclick="event.stopPropagation(); saveAndRedeploy('${c.slug}')">
+                  SPREMI & REDEPLOY
                 </button>
                 <button class="btn btn-outline btn-sm"
-                  style="white-space:nowrap"
+                  title="Redeploy bez promjene videa"
                   onclick="event.stopPropagation(); doRedeployLanding('${c.slug}')">
-                  ↻ REDEPLOY
+                  ↻
                 </button>
               </div>
             </div>
@@ -853,25 +854,37 @@ async function updateStatus(slug, status) {
   } catch {}
 }
 
+// Saves the video URL to the DB, normalises it, and returns the embed URL (or null on error).
 async function saveVideoUrl(slug) {
   const input = document.getElementById(`video-url-${slug}`);
   const url = input ? input.value.trim() : '';
+  const r = await fetch('/api/update-video-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, videoUrl: url }),
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  if (input && j.url) input.value = j.url;
+  return j.url ?? null;
+}
+
+// Single-click: save video URL to DB then immediately regenerate + redeploy.
+async function saveAndRedeploy(slug) {
+  setLogStatus('Sprema video URL…', '#C9A227');
+  let saved;
   try {
-    const r = await fetch('/api/update-video-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, videoUrl: url }),
-    });
-    if (r.ok) {
-      const j = await r.json();
-      if (input && j.url) input.value = j.url; // show normalised embed URL
-      setLogStatus('Video URL spremljen ✓', '#52A882');
-    } else {
-      setLogStatus('Greška pri spremanju video URL-a.', '#E05252');
-    }
+    saved = await saveVideoUrl(slug);
   } catch {
-    setLogStatus('Greška.', '#E05252');
+    setLogStatus('Greška pri spremanju.', '#E05252');
+    return;
   }
+  if (saved === null) {
+    setLogStatus('Greška pri spremanju video URL-a.', '#E05252');
+    return;
+  }
+  setLogStatus(`Spremljeno (${saved}) — redeploy…`, '#C9A227');
+  await doRedeployLanding(slug);
 }
 
 async function doRedeployLanding(slug) {
