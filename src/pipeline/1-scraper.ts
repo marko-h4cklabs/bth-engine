@@ -1,17 +1,12 @@
-import { chromium } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { resolve } from 'path';
 import { logger } from '../utils/logger.js';
 import { sleep, randomBetween } from '../utils/sleep.js';
 import type { BusinessBase } from '../types/index.js';
 
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0',
-];
-
-function pickUserAgent(): string {
-  return USER_AGENTS[randomBetween(0, USER_AGENTS.length - 1)] ?? USER_AGENTS[0]!;
-}
+chromium.use(StealthPlugin());
 
 async function getText(
   page: import('playwright').Page,
@@ -88,6 +83,17 @@ function extractCityFromAddress(address: string): string {
   return parts[parts.length - 2] ?? 'Zagreb';
 }
 
+function saveDebugHtml(html: string): void {
+  try {
+    const dir = resolve(process.cwd(), 'output');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(resolve(dir, 'debug-companywall.html'), html, 'utf-8');
+    logger.warn('  Saved debug HTML → output/debug-companywall.html');
+  } catch {
+    // non-fatal
+  }
+}
+
 export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
   logger.info(`Launching browser → ${url}`);
 
@@ -98,10 +104,10 @@ export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
 
   try {
     const context = await browser.newContext({
-      userAgent: pickUserAgent(),
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       locale: 'hr-HR',
       timezoneId: 'Europe/Zagreb',
-      viewport: { width: 1366, height: 768 },
+      viewport: { width: 1440, height: 900 },
     });
 
     const page = await context.newPage();
@@ -111,10 +117,13 @@ export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
     await sleep(randomBetween(1500, 3500));
 
     // ── Company name ─────────────────────────────────────────────────────────
-    // h1 = short trade name: "POLIKLINIKA BAGATIN d.o.o." — used for slug, search, display
-    // dl "Naziv" = full legal description — logged only, not stored as legalName
     const legalName = await getText(page, 'h1[itemprop="name"]');
     const fullLegalName = await extractDlValue(page, 'Naziv');
+
+    if (!legalName) {
+      logger.warn('  legalName empty — bot detection likely triggered, saving debug HTML');
+      saveDebugHtml(await page.content());
+    }
 
     logger.info(`  legalName: "${legalName}"`);
     if (fullLegalName && fullLegalName !== legalName) {
@@ -122,7 +131,6 @@ export async function scrapeCompanyWall(url: string): Promise<BusinessBase> {
     }
 
     // ── OIB ──────────────────────────────────────────────────────────────────
-    // schema.org itemprop="vatID" is the most reliable
     const oibItemprop = await getText(page, '[itemprop="vatID"]');
     const oibDl = await extractDlValue(page, 'OIB');
     const oibRaw = oibItemprop || oibDl;

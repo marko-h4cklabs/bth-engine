@@ -29,7 +29,9 @@
     "express": "^5.2.1",
     "got": "^14.4.2",
     "playwright": "^1.47.0",
+    "playwright-extra": "^4.3.6",
     "puppeteer": "^23.4.0",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
     "zod": "^3.23.8"
   },
